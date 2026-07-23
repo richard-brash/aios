@@ -16,6 +16,8 @@ Approval notation below means a Decision and Approval recorded before the transi
 - **Authorized:** no separate Approval is intrinsically required, but the Command still requires valid authority.
 - **Automatic:** a deterministic kernel Command enforces a previously approved condition.
 
+For human-reserved transitions, the underlying A4 disposition or Policy-reserved A3 disposition MUST have an eligible Human accountable decider or be the valid derived result of an eligible Human Governing Body process. A proposer, recommender, approver, or technical recorder is not the accountable decider merely by filling that other role. Approval satisfies a separate governance condition and does not convert an AI-authored Decision into a Human Decision or create Authority.
+
 Emergency suspension is Authorized for an authorized Human or designated safety control on credible evidence of specified risk. It opens or links an Incident and requires timely human review; it grants no unrelated authority.
 
 State names apply only where they are semantically valid. Creation is represented by each diagram's initial transition. `active`, `suspended`, `completed`, `archived`, `expired`, `revoked`, and `deleted` are included where meaningful; their absence is a prohibition, not an omission. For example, immutable Events and persistent Actor attribution cannot be deleted, an Organization dissolves rather than “completes,” and only time- or condition-bounded entities can expire. No implementation may add one of these generic states to an entity unless a future specification explicitly defines its preconditions and effects.
@@ -36,7 +38,7 @@ stateDiagram-v2
     Deleted --> [*]
 ```
 
-- Organization bootstrap atomically establishes the Organization, initiating verified Human Actor, constitutional owner or governor Role, Human Role Assignment, founding Decision, initial Grants, founding Events, and Audit Record references. No operational Command is legal before it completes, and bootstrap authority ends with establishment.
+- Organization bootstrap is a one-time reserved genesis transition admitted directly under the Constitution because no organizational Grant yet exists. A verified Human initiates one atomic transaction establishing the Organization, Human Actor, constitutional owner or governor Role, Human Role Assignment, founding constitutional Decision, initial Grants, recording Command, founding Events, and Audit Record references. No partial state or ordinary operational work is legal. Exact retries are idempotent; competing attempts deterministically resolve or reject; and the exception ends with successful establishment.
 - `Proposed -> Active`, mission or governance change implicit in activation, and every transition to `Dissolving` are Human-reserved. Initial activation occurs only as the final state of a complete bootstrap transaction; later transitions follow ordinary rules.
 - `Active -> Suspended` is Authorized only for eligible human governance or emergency safety control; emergency use requires Incident review.
 - `Suspended -> Active` is Human-reserved and requires documented remediation.
@@ -60,11 +62,11 @@ stateDiagram-v2
     Terminated --> Archived: EmployeeArchived
 ```
 
-- Creation of an AI Employee is Policy-required; hiring, dismissal, compensation, or surveillance of a human Employee is Human-reserved.
+- Creation of an Employee—the Constitution's AI Employee—is Policy-required. Hiring, dismissal, compensation, or surveillance of a Human is governed through the Human's organizational relationship and is Human-reserved where the Constitution, law, or Policy requires; Humans do not become Employee entities.
 - Activation requires an active Role assignment, supervisor or governance owner, escalation path, budget, and Authority Grant. Onboarding grants no operational authority.
 - Suspension is Authorized under the emergency rule or Policy-required otherwise. It suspends employee Grants and sponsored workers unless a narrower safe disposition is explicitly recorded.
 - Restoration is Policy-required and requires Incident or suspension review, eligible authority, and refreshed Grants.
-- Offboarding is Policy-required for AI Employees and Human-reserved for human employment. Termination revokes Grants, credentials, active assignments, and worker sponsorship after safe handoff.
+- Offboarding is Policy-required for Employees. Ending a Human employment relationship is separately Human-reserved where applicable. Termination revokes Grants, credentials, active assignments, and worker sponsorship after safe handoff.
 - Employee identity and attribution are never deleted; archival preserves continuity records.
 
 ## 4. Temporary Worker
@@ -114,10 +116,12 @@ stateDiagram-v2
 - Approval is Policy-required and must verify issuer authority, mission or duty trace, legality, success evidence, resource bounds, and conflict with higher rules.
 - Activation is Authorized after approval and required resource reservations.
 - Suspension is Authorized for stop conditions, budget exhaustion, authority loss, material uncertainty, conflict, or Incident. Resume is Policy-required after the cause is resolved.
-- Completion requires an authorized Decision based on pinned evidence satisfying current success criteria. Human approval is required where the Goal or its result exercises A4 power or Policy requires it.
+- Completion requires an authorized Decision based on pinned evidence satisfying current success criteria. Where completion is an A4 or Human-reserved A3 disposition, the accountable decider is an eligible Human or valid Human Governing Body process; every separately required Approval must also be present.
 - Cancellation is Policy-required and must account for commitments, dependent Tasks, Resources, Artifacts, and records. Completed and cancelled Goals cannot reactivate; materially renewed work creates a new Goal.
 
 ## 6. Task
+
+Task lifecycle does not require a Project, Objective, or Plan. Those are optional planning structures, and a Task may attach directly to its Goal or duty Work Root. Schedules and assignments may be proposed by Employees, planners, workflow services, or organizational processes; the kernel admits Commands and enforces valid transitions but does not choose scheduling strategy.
 
 ```mermaid
 stateDiagram-v2
@@ -173,12 +177,12 @@ stateDiagram-v2
 ```
 
 - A request requires exactly one recorded Decision, exact requested disposition, alternatives, evidence, benefit, cost, risks, reversibility, eligible approver route, and proposed `approval_mode`. Every granted Approval records `used_count`, effective and expiry conditions, conditions, revocation triggers, and applicable action, Resource, risk, and budget scope.
-- Only an eligible Actor whose authority covers the Decision may grant or deny. Self-approval of A3 is prohibited unless a narrow explicit low-risk Policy permits it; A4 always requires the responsible Human authority.
+- Only an eligible Actor whose authority covers the Approval disposition may grant or deny. The approver is distinct from the Decision's accountable decider even when one eligible Human fills both roles. Self-approval of A3 is prohibited unless a narrow explicit low-risk Policy permits it; A4 always requires responsible Human authority for both the accountable Decision and every separately required Approval.
 - Grant requires an informed, specific disposition before execution. Denial and nonresponse confer no authority.
 - A `single_use` Approval has an effective usage limit of one and transitions to `consumed` when its one authorized execution is recorded, then to archival. A `bounded_repeat` Approval requires a positive `usage_limit` and remains granted only until that limit, expiry, revocation, invalidation, or another condition is reached. Each use increments `used_count` atomically.
 - A `standing` Approval requires a review schedule and applies only to a narrowly defined recurring class of A2 activity expressly permitted by Policy. It MUST NOT authorize A4 matters or broadly authorize unspecified A3 actions.
 - Every use is independently attributable and rechecked against current Authority, Policy, budget, Decision assumptions, scope, risk, Resources, conditions, and revocation triggers. Approval remains distinct from Authority.
-- Expiry and satisfaction of a use limit are Automatic. Revocation is Authorized by the approver or superior eligible authority. Material change to scope, cost, risk, evidence, assumptions, Policy, Decision version, or recurring action class invalidates the Approval automatically.
+- Expiry and satisfaction of a use limit are Automatic. Revocation is Authorized by the approver or superior eligible authority. Material change to scope, cost, risk, evidence, assumptions, Policy, `decision_content_version`, or recurring action class invalidates the Approval automatically.
 - A bounded or standing Approval may be archived only after expiry, revocation, invalidation, or authorized retirement; its uses, effect, and evidence remain auditable.
 
 ## 8. Authority Grant
@@ -202,7 +206,7 @@ stateDiagram-v2
     Superseded --> Archived: AuthorityArchived
 ```
 
-- Activation requires exactly one eligible Issuer, one recipient, complete scope and constraints, valid parent authority for delegation, and all Policy-required Approvals. Human approval is mandatory for A4 and constitutionally reserved A3 matters.
+- Activation requires exactly one eligible Issuer, one recipient, complete scope and constraints, valid parent authority for delegation, and all Policy-required Approvals. The underlying Grant disposition requires an eligible Human accountable decider for A4 and Human-reserved A3 matters; every separately required Human Approval is additional and does not supply that deciding authority.
 - A Grant is usable only between its effective and expiry conditions while `active`. Silence, pending state, suspension, expiry, or nonresponse denies authority.
 - Suspension is Authorized under emergency rules or by the Issuer or superior authority. Restoration is Policy-required and must revalidate issuer authority, recipient, scope, conditions, Policy, Approvals, budgets, and Incident remediation.
 - Expiry is Automatic and irreversible. Revocation is Authorized by the Issuer or superior eligible authority and prevents new actions. Supersession requires a new valid Grant; it cannot rewrite the old Grant.
@@ -261,7 +265,7 @@ stateDiagram-v2
 - Corroboration and authoritative designation are Policy-required and evidence-based. Repeated output derived from the same source is not independent corroboration.
 - Dispute, invalidation, and supersession preserve original content and provenance and link the contradictory or replacement records. Supersession never silently mutates a Record.
 - Archival follows retention Policy and active-use checks. Redaction or deletion requires valid authority, purpose, scope, dependency, legal-hold, audit-impact, and propagation checks. Human approval is required when Policy or law reserves it.
-- Deletion leaves a nonreconstructive tombstone and never conceals wrongdoing or removes immutable Event history.
+- Deletion leaves a nonreconstructive tombstone and later deletion Event and never conceals wrongdoing or silently rewrites immutable Event history. Sensitive or erasable content SHOULD normally be held behind stable governed references. Redaction, sealing, access restriction, or cryptographic erasure MAY make that content unavailable when Policy or law requires, while replay deterministically preserves the availability state and never re-exposes removed content.
 
 ## 11. Artifact
 
@@ -283,8 +287,8 @@ stateDiagram-v2
     Archived --> Deleted: ArtifactDeleted
 ```
 
-- Creation requires one owner, creator, custodian, source Task or duty, provenance, classification, integrity reference, and version.
+- Creation requires one owner, creator, custodian, source Task or duty, provenance, classification, integrity reference, and `artifact_content_version`.
 - Review and approval requirements depend on risk, publication, external commitment, protected data, rights, safety, and Policy. Public, binding, rights-affecting, or irreversible publication requires the applicable consequential Decision and Approval.
 - Activation makes an internal Artifact current; publication creates an external effect and is not presumed reversible.
-- Material changes produce a new version and may invalidate approval. Supersession links versions without destroying history. Withdrawal records ongoing obligations and cannot guarantee recall of disclosed copies.
+- Material changes produce a new `artifact_content_version` and may invalidate Approval. Supersession links content versions without destroying history. Withdrawal records ongoing obligations and cannot guarantee recall of disclosed copies.
 - Deletion is Policy-required and allowed only after ownership, retention, dependency, licensing, legal-hold, Incident, and audit checks. Required tombstones and Events remain.

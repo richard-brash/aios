@@ -9,7 +9,7 @@ These principles constrain every implementation of the AIOS kernel and its surro
 
 ## 2. Events are immutable
 
-Accepted Events MUST be append-only. Correction, reversal, supersession, redaction, and deletion are expressed as later Events; original history is never silently rewritten.
+Accepted Events MUST be append-only. Correction, reversal, supersession, redaction, access restriction, and deletion are expressed as later Events; original history is never silently rewritten. Events contain the minimum sensitive content necessary for accountability, while erasable or controlled content normally resides behind governed stable references. Lawful redaction or cryptographic erasure may remove referenced content but leaves a nonreconstructive tombstone and deterministic governed-availability state; historical reference never grants access to removed content.
 
 **Why:** Immutable facts make attribution, dispute resolution, tamper detection, recovery, and chronological reconstruction possible. Mutable history lets operational power rewrite accountability.
 
@@ -23,7 +23,7 @@ This requirement covers AIOS governance, identity, authority, lifecycle, decisio
 
 ## 4. The kernel is deterministic
 
-For the same valid Event sequence and specification versions, the kernel MUST derive the same state and decisions about transition validity. Time, randomness, model inference, network results, Tool results, and external observations enter the kernel only as recorded inputs. Replay MUST produce no external effects.
+For the same valid Event sequence and applicable schema and transition-specification versions, the kernel MUST derive the same state and decisions about admission and transition validity. Time, randomness, model inference, network results, Tool results, and external observations enter the kernel only as recorded inputs. Replay MUST produce no external effects. This requirement governs validation, admission, transitions, and replay; it does not require Employee planning, AI inference, recommendations, Tools, or external execution to be deterministic.
 
 **Why:** Determinism is necessary for audit, testing, recovery, incident analysis, and reliable authority enforcement. Nondeterminism at the governance boundary makes past behavior irreproducible.
 
@@ -41,7 +41,7 @@ Durable organizational knowledge MUST reside in governed Memory Records with pro
 
 ## 7. Identity is persistent
 
-Actors, Organizations, Goals, Tasks, Grants, Decisions, Events, records, and Artifacts MUST use stable identifiers that are never reassigned. Actor identity MUST be separate from roles, credentials, models, and sessions.
+Actors, Organizations, Goals, Tasks, Grants, Decisions, Events, records, and Artifacts MUST use stable identifiers that are never reassigned. Their institutional namespace MUST preserve uniqueness and meaning across export, migration, archival restoration, and multiple installations. Actor identity MUST be separate from roles, credentials, models, and sessions.
 
 **Why:** Persistent identity preserves attribution and continuity across role changes, credential rotation, model replacement, archival, and lawful deletion.
 
@@ -71,7 +71,7 @@ Coordination between kernel, Employees, Tools, humans, and services SHOULD occur
 
 ## 12. Humans retain constitutional authority
 
-The system MUST route A4 and constitutionally reserved A3 Decisions to eligible Humans, preserve meaningful review, and provide suspension, appeal, and amendment mechanisms. AI recommendations may inform but MUST NOT impersonate or substitute for accountable human disposition.
+Every A4 disposition and every A3 disposition reserved by the Constitution or valid Policy to Humans MUST have an eligible Human Actor as accountable decider or be the valid derived result of an eligible Human Governing Body process. AI Actors may research, recommend, propose, route, prepare, initiate technical recording, or record the result but MUST NOT impersonate or substitute for the accountable decider. A separately required Human Approval does not convert an AI-authored Decision into a Human Decision. Operational Decisions not reserved to Humans may remain within eligible AI Employee authority.
 
 Collective governance MUST preserve one technical initiating Actor plus each Human's individually attributable disposition, current Policy for eligibility, quorum, conflicts, and voting, and the derived collective outcome. A Governing Body MUST NOT be modeled as a fictional Human, and initiation alone confers no deciding authority.
 
@@ -85,7 +85,7 @@ Services SHOULD have narrow responsibilities, explicit versioned contracts, inde
 
 ## 14. The kernel owns orchestration
 
-The kernel MUST own Command admission, singular technical initiation plus participant attribution, recording-command and causal-reference separation, Policy and authority evaluation, Work Root validation, lifecycle transition validation, event ordering, idempotency, resource enforcement, approval-mode and usage gating, subscription authorization, bootstrap atomicity, and audit linkage. The kernel MUST NOT own domain reasoning or silently perform Employee work.
+The kernel MUST own Command admission, singular technical initiation plus participant attribution, recording-command and causal-reference separation, Policy and authority validation, Work Root validation, invariant and lifecycle transition enforcement, Event ordering, idempotency, resource enforcement, approval-mode and usage gating, subscription authorization, constitutional genesis atomicity, and audit linkage. It maintains deterministic governed state and prevents invalid transitions. The kernel MUST NOT choose organizational priorities, create Plans, decide scheduling strategy, allocate work optimally, act as the sole workflow engine, own domain reasoning, or silently perform Employee work. Employees, higher-level planners, workflow services, and organizational processes may propose and manage priorities and schedules subject to kernel admission.
 
 **Why:** Central ownership of governance semantics prevents each worker or Tool from interpreting constitutional boundaries differently, while keeping the kernel small and deterministic.
 
@@ -96,6 +96,10 @@ Employees, not the kernel, are accountable institutional Actors for planning, ev
 **Why:** Separating governed orchestration from accountable work avoids a monolithic agent and preserves clear responsibility when models or Tools change.
 
 Every Task and Action MUST have exactly one Work Root: either an active Goal or a complete governance, safety, compliance, or maintenance duty reference, never both or neither. Duty-rooted work receives the same authority, evidence, resource, lifecycle, Decision, and audit controls as Goal-rooted work.
+
+Goal is the primary purpose-bearing structure for ordinary work. Project, Objective, and Plan are optional structures that Organizations may use in any useful subset; Tasks may attach directly to a Goal or duty, and neither Project nor Objective is a Work Root. Conformance requires support for these representations, not mandatory use of one project-management method.
+
+Relationship entities and accepted Events are authoritative. Inverse collections on related entities are derived replayable projections or indexes unless an exception explicitly names and justifies another canonical source. Derived collections MUST NOT become independently writable competing truth.
 
 ## 16. Organizations own Policy
 
@@ -151,6 +155,6 @@ An implementation conforms only if it can demonstrate, with deterministic and ad
 - deletion and redaction obey retention, legal-hold, provenance, and tombstone rules; and
 - failures cannot bypass organization, authority, Policy, resource, or human-reserved boundaries.
 
-Bootstrap conformance additionally requires one atomic constitutional transaction to establish the Organization, verified initiating Human Actor, constitutional owner or governor Role, Role Assignment, founding Decision, initial Grants, founding Events, and Audit Record references before operational Commands are admitted. Reusable Approvals conform only when mode, usage, expiry, conditions, revocation, review, and per-use current-state checks remain enforceable and separate from Authority.
+Bootstrap conformance additionally requires a reserved one-time genesis Command, admitted directly under the Constitution because no organizational Grant yet exists, to atomically establish the Organization, verified initiating Human Actor, constitutional owner or governor Role, Role Assignment, founding Decision, initial Grants, recording Command, founding Events, and Audit Record references before operational Commands are admitted. It performs no ordinary work; competing attempts resolve deterministically or reject; and the exception ends on success. Reusable Approvals conform only when mode, usage, expiry, conditions, revocation, review, and per-use current-state checks remain enforceable and separate from Authority.
 
 Passing a test suite does not permit deviation from the Constitution or the normative contracts in this specification.

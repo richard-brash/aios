@@ -27,7 +27,7 @@ An Employee's persistent identity has one `organization_id`. Work for another Or
 
 Every Command and Event identifies exactly one `initiating_actor_id`. Every Decision, Approval, Tool invocation, Action, Memory Record, and Artifact creation remains attributable to its actual persistent Actor or Actors. Records MAY also include participating, approving, and reviewing Actor identifiers, a Governing Body, and individual vote or disposition records. The initiating Actor is not automatically the decider or authority. A model, prompt, session, credential, display name, or fictional Human MUST NOT substitute for an Actor identity.
 
-Organization bootstrap MUST atomically establish the Organization; initiating verified Human Actor; constitutional owner or governor Role; Human Role Assignment; founding Decision; initial Authority Grant or Grants; and founding Events and Audit Record references. No unattributed or operational activity may intervene. Bootstrap authority is limited to establishment; ordinary rules apply after completion.
+Constitutional bootstrap is the only exception to the requirement for preexisting organizational authority. Ordinary Authority cannot authorize its own creation. A reserved genesis Command initiated by a verified Human is admitted directly under the Constitution and MUST atomically establish the Organization; Human Actor; constitutional owner or governor Role; Human Role Assignment; founding Decision; initial Authority Grant or Grants; recording Command; founding Events; and Audit Record references. No partial state, unattributed activity, or operational work may intervene. Exact retries are idempotent; competing attempts resolve deterministically or reject. The exception is exhausted on completion and ordinary rules then apply.
 
 **Rationale:** Institutional accountability must survive model replacement, context loss, credential rotation, and interface changes.
 
@@ -43,6 +43,12 @@ An Actor may perform organizational work only through an active Role assignment,
 
 **Rationale:** Roles describe duties and eligibility; explicit Authority Grants define permission. Keeping them distinct prevents privilege by title.
 
+### INV-005A — Canonical relationships have one source of truth
+
+Every governed relationship has exactly one declared authoritative relationship entity or accepted Event history. Inverse identifier collections on related entities are derived projections or indexes unless explicitly declared otherwise; they MUST be replayable and MUST NOT be independently mutated as competing truth. Any exception names and justifies its canonical record and reconciliation rule.
+
+**Rationale:** Bidirectional navigation is useful, but two independently writable representations create irreconcilable authority, membership, ownership, and audit state.
+
 ## 3. Mission and work traceability
 
 ### INV-006 — Goal traceability
@@ -56,6 +62,12 @@ Every Goal advances exactly one current organizational mission or one explicit g
 Every Task and Action references exactly one of `goal_id` or `duty_reference` for its entire lifetime. It MUST NOT reference both and MUST NOT reference neither. A duty reference identifies duty type; governing Policy, constitutional provision, Incident, compliance obligation, or maintenance mandate; accountable issuer or owner; scope; and review or completion condition. A Goal-rooted Task MAY serve multiple Objectives and MAY belong to one Project. Changing the Work Root requires a new Task or Action.
 
 **Rationale:** A single accountable Work Root preserves authority, budget, priority, completion, cancellation, and audit traceability without excluding constitutionally permitted governance, safety, compliance, or maintenance work.
+
+### INV-007A — Intermediate planning structures are optional
+
+Goal is the primary purpose-bearing concept for ordinary work. Project, Objective, and Plan are optional structures that an Organization MAY use independently where useful. A Task MAY trace directly to its Goal or duty, and neither Project nor Objective is a Work Root. Conformance requires representational support for these structures, not their instantiation in every Organization or work path.
+
+**Rationale:** Governance requires purpose traceability, not adoption of one project-management methodology.
 
 ### INV-008 — Bounded work
 
@@ -133,11 +145,11 @@ Silence, missing data, conflicting Grants, uncertain scope, expired state, inval
 
 **Rationale:** Guessing toward permission converts ambiguity into authority escape.
 
-### INV-019 — Human-reserved powers remain human
+### INV-019 — Human-reserved accountable decisions remain human
 
-Every A4 Decision and every constitutionally reserved A3 Decision has an attributable Approval from the eligible Human owner or governing body before execution. An AI recommendation MUST NOT be recorded as the accountable human disposition.
+Every A4 disposition and every A3 disposition reserved by the Constitution or applicable Policy to Humans has an eligible Human Actor as its accountable decider or is the valid derived result of an eligible Human Governing Body process. Individual votes, recusals, consents, dissents, and dispositions remain attributable. An AI Actor MAY research, analyze, recommend, propose, route, prepare, initiate technical recording, or record the result, but MUST NOT be represented as the accountable decider. A separately required Human Approval MUST still be obtained, but Approval does not convert an AI-authored Decision into a Human Decision. Operational Decisions not reserved to Humans MAY be made by an otherwise eligible AI Employee.
 
-**Rationale:** Delegation cannot transfer powers that law or the Constitution reserves to Humans.
+**Rationale:** Delegation and Approval cannot transfer accountable deciding power that law, the Constitution, or valid Policy reserves to Humans.
 
 ### INV-020 — Every consequential Decision is reconstructable
 
@@ -153,7 +165,7 @@ Every Decision has at least one supporting evidence reference or explicitly reco
 
 ### INV-022 — Every Approval references exactly one Decision
 
-Every Approval identifies one Decision and the exact Decision version reviewed. A material change to alternatives, evidence, assumptions, scope, cost, risk, benefit, reversibility, Policy, or requested outcome invalidates it.
+Every Approval identifies one Decision and the exact `decision_content_version` reviewed. A material change to alternatives, evidence, assumptions, scope, cost, risk, benefit, reversibility, Policy, or requested outcome invalidates it.
 
 **Rationale:** Informed approval is specific to a known proposition; it cannot float to a materially different action.
 
@@ -183,6 +195,12 @@ Every use is separately attributable and revalidated against current Authority, 
 
 **Rationale:** Reuse must not turn a specific informed disposition into unbounded or stale permission.
 
+### INV-024B — Governance stages do not collapse
+
+A Proposal or recommendation is nonauthoritative; a Decision records the selected disposition and accountable decider; Approval satisfies a separate required governance condition; execution eligibility is evaluated against current Authority, Policy, scope, budget, prerequisites, lifecycle, and conditions; an Action records an attempted exercise of authority; and outcome evidence records what actually happened. Completion of one stage MUST NOT be recorded as completion of another.
+
+**Rationale:** Intent, disposition, oversight, permission, attempt, and reality fail independently and require different accountability.
+
 ### INV-025 — Revocation is prospective, not erasing
 
 Suspension, expiry, or revocation immediately prevents new actions under the affected Grant or Approval but MUST NOT erase prior attribution, commitments, effects, or accountability.
@@ -203,6 +221,8 @@ An accepted Event is never updated, overwritten, reordered, or silently removed.
 
 **Rationale:** Immutable ordered facts are required for reconstruction, dispute resolution, and tamper evidence.
 
+Event-type schemas determine whether evidence, result, epistemic status, confidence, and Resource references are required, optional, prohibited, or explicitly not applicable. Material claims, observations, recommendations, Decisions, Actions, and outcomes retain the applicable evidence and epistemic information. Mechanical lifecycle facts MUST NOT invent ceremonial values.
+
 ### INV-028 — Authoritative AIOS state derives from Events
 
 All authoritative AIOS governance, identity, authority, lifecycle, decision, resource-accounting, memory, and audit state changes only through deterministic application of accepted Events. An AIOS projection, cache, conversation, model context, or administrative edit MUST NOT independently become authoritative AIOS governance state. External systems MAY retain authoritative domain state, but AIOS MUST record stable references, observed or reconciled versions, integrity identifiers, ownership, authority, classification, provenance, material external observations, reconciliation status, and Decision and audit linkage.
@@ -214,6 +234,8 @@ All authoritative AIOS governance, identity, authority, lifecycle, decision, res
 Given the same valid Event sequence and specification versions, replay produces the same authoritative AIOS projections and governed external references and emits no Commands, Events, Tool invocations, notifications, charges, or external effects. It does not claim to reconstruct inaccessible external systems.
 
 **Rationale:** Recovery and verification must not repeat real-world actions or depend on nondeterministic inputs.
+
+Determinism in this invariant governs kernel validation, admission, transition evaluation, and replay. It does not require AI Employees, Temporary Workers, planning, inference, recommendations, Tools, or external execution to be deterministic; their material outputs become governed inputs only after attributable admission.
 
 ### INV-030 — Every consequential trace is complete
 
@@ -261,19 +283,19 @@ Consequential Decisions use pinned Record identifiers and versions after checkin
 
 ### INV-037 — No Artifact exists without ownership
 
-Every Artifact identifies exactly one owning Organization or lawful external owner, one current custodian, creator, source Task or duty, provenance, classification, integrity reference, and version. Ownership transfer is a consequential, recorded Decision.
+Every Artifact identifies exactly one owning Organization or lawful external owner, one current custodian, creator, source Task or duty, provenance, classification, integrity reference, and `artifact_content_version`. Ownership transfer is a consequential, recorded Decision.
 
 **Rationale:** Outputs create rights, duties, costs, disclosure risks, and retention obligations that require an accountable owner.
 
 ### INV-038 — Material Artifact versions are immutable
 
-Every material Artifact content change creates a new addressable version linked to its predecessor. Publication or approval applies only to the reviewed version and stated conditions.
+Every material Artifact content change creates a new addressable `artifact_content_version` linked to its predecessor. Publication or approval applies only to the reviewed content version and stated conditions.
 
 **Rationale:** Review and audit are meaningless if approved content can change underneath its identifier.
 
 ### INV-039 — Lawful deletion preserves accountability
 
-Deletion or redaction requires identity, authority, scope, dependency, retention, legal-hold, privacy, Incident, and audit-impact checks and propagates to derived retrieval to the feasible lawful extent. It leaves only the minimum nonreconstructive tombstone and MUST NOT conceal wrongdoing.
+Events contain the minimum sensitive content necessary for integrity, accountability, and interpretation. Sensitive or erasable content normally resides in governed Records or Resources behind stable references. Deletion, redaction, sealing, restriction, or cryptographic erasure requires identity, authority, scope, dependency, retention, legal-hold, privacy, Incident, and audit-impact checks and is represented by later Events. It propagates to derived retrieval to the feasible lawful extent, leaves the minimum nonreconstructive tombstone and governed availability state, MUST NOT silently rewrite accepted history or conceal wrongdoing, and MUST NOT permit replay or historical references to expose removed or restricted content.
 
 **Rationale:** Privacy and deletion duties must coexist with constitutional accountability and preservation obligations.
 
@@ -297,8 +319,8 @@ Confidence is recorded and explained but MUST NOT create permission, prove a cla
 
 **Rationale:** Confidence describes belief; it is neither truth nor governance.
 
-### INV-043 — Event epistemic status governs confidence
+### INV-043 — Event epistemic applicability governs confidence
 
-Every Event records an `epistemic_status` of deterministic, observed, asserted, inferred, predicted, or disputed. Confidence is omitted or explicitly not applicable for deterministic transition facts; it is required and explained on the Organization-approved scale for inferred, predicted, uncertain observed, and disputed assertions. Confidence never establishes authority, validity, or truth.
+Every Event-type schema declares whether `epistemic_status` is required or explicitly not applicable. Events asserting, observing, inferring, predicting, disputing, recommending, deciding, acting upon, or reporting outcomes use deterministic, observed, asserted, inferred, predicted, or disputed as applicable. A purely mechanical lifecycle or bookkeeping fact MAY declare epistemic status not applicable and MUST NOT invent evidence or confidence. Confidence is omitted or explicitly not applicable for deterministic transition facts and is required and explained on the Organization-approved scale for inferred, predicted, uncertain observed, and disputed assertions. Confidence never establishes authority, validity, or truth.
 
 **Rationale:** Administrative certainty and epistemic uncertainty require different audit semantics; assigning artificial maximum confidence to deterministic facts obscures that distinction.

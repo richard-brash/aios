@@ -22,7 +22,7 @@ All entities have these common required attributes unless a definition explicitl
 
 Common immutable fields are `id`, `organization_id`, `created_at`, and `created_by_actor_id`. Changes to mutable fields MUST occur through accepted commands and immutable events. References to evidence, policy, authority, approvals, and other entities are identifiers, never untracked embedded copies.
 
-Organization bootstrap is the sole identity-ordering exception: an attributable, verified Human principal initiates creation, and the Organization plus that Human's organizational Actor identity are established atomically by the accepted bootstrap Command. The resulting `created_by_actor_id` references that Actor. No operational Command may occur between those creations, and bootstrap confers no authority beyond the Human-reserved creation Decision and the explicit Grants recorded with or after activation.
+Organization bootstrap is the sole identity-ordering exception. One constitutional bootstrap transaction atomically establishes the Organization; the initiating verified Human Actor; the constitutional owner or governor Role; the Human's Role Assignment; the founding Decision; the initial Authority Grant or Grants; and the founding Events and Audit Record references. The founding Decision uses a complete `duty_reference` to the applicable constitutional establishment provision. The resulting `created_by_actor_id` values reference the initiating Human Actor. No operational Command may occur before the entire transaction completes. Bootstrap authority is limited to the Human-reserved act of establishing the Organization and its initial governance; after completion, every ordinary Role, Authority, Policy, Approval, Command, Event, and lifecycle rule applies.
 
 Ownership means constitutional control and accountability, not technical possession. Actors, including AI Employees and Temporary Workers, are members or agents of an Organization and never own organizational assets. A Human may legally own or govern an Organization. Where a lifecycle includes deletion, deletion means inaccessible content plus a lawful minimal tombstone; it never means rewriting event history.
 
@@ -67,6 +67,19 @@ Ownership means constitutional control and accountability, not technical possess
 - **Lifecycle state:** Actor lifecycle states. Death or departure ends activity but does not remove attribution.
 - **Relationships:** may own or govern Organizations; may sponsor workers; may issue, approve, revoke, or review authority within their own authority; may also be represented by an Employee relationship.
 
+### Governing Body
+
+- **Purpose:** Represent a genuine collective human governance authority without inventing a fictional Human Actor.
+- **Description:** A versioned body whose eligible Human members, quorum, voting, and disposition rules are defined by current Policy. The body is not a substitute for individual attribution.
+- **Required attributes:** common attributes; `name`; `member_actor_ids`; `governing_policy_ids`; quorum rule; voting or consent rule; decision scope; accountable records custodian.
+- **Optional attributes:** officers; committees; term dates; conflict and recusal rules; external legal identity reference.
+- **Immutable fields:** `governing_body_id`, organization membership, creation metadata. Membership and rule changes are versioned.
+- **Mutable fields:** membership, officers, rule references, scope, lifecycle state through authorized Events.
+- **Globally unique identifier:** `governing_body_id`.
+- **Ownership:** Organization under its lawful human governance.
+- **Lifecycle state:** `proposed`, `active`, `suspended`, `dissolved`, `archived`.
+- **Relationships:** contains Human members; governed by Policies; may collectively issue Decisions, Approvals, Policies, and Grants when quorum is satisfied; retains individual votes or dispositions and exactly one technical initiating Actor for each Command and Event.
+
 ### Employee
 
 - **Purpose:** Provide a persistent institutional identity responsible for ongoing organizational duties.
@@ -83,15 +96,15 @@ Ownership means constitutional control and accountability, not technical possess
 ### Temporary Worker
 
 - **Purpose:** Provide bounded, purpose-specific specialist capacity.
-- **Description:** A nonpersistent Actor created for one defined purpose, with one Sponsor, explicit least-privilege authority, a resource ceiling, and a mandatory expiry or completion condition.
+- **Description:** A persistent institutional Actor with temporary operational tenure, created for one bounded purpose. Its operational authority and availability are temporary, but its identity and attribution are durable.
 - **Required attributes:** Actor attributes; `sponsor_actor_id`; `purpose`; `task_ids`; `authority_grant_ids`; `budget_ids`; `expires_at` or `completion_condition`; `delegation_permission`; `attribution_record_id`.
 - **Optional attributes:** model and tool eligibility; stop conditions; handoff target.
-- **Immutable fields:** `actor_id`, organization membership, `sponsor_actor_id`, original purpose, creation metadata. Purpose expansion requires a new worker.
+- **Immutable fields:** `actor_id`, organization membership, `sponsor_actor_id`, original purpose, creation metadata. The identity is never reused. Purpose expansion requires a new worker.
 - **Mutable fields:** narrower task assignments, budgets, tool eligibility, expiry shortened but not extended beyond the authorizing grant, lifecycle state.
 - **Globally unique identifier:** inherited `actor_id`.
 - **Ownership:** The Organization owns the institutional identity and work product; the Sponsor is accountable but is not the owner.
 - **Lifecycle state:** `requested`, `active`, `suspended`, `completed`, `expired`, `revoked`, `archived`.
-- **Relationships:** belongs to exactly one Organization; has exactly one Human or Employee Sponsor; works for one purpose and one or more bounded Tasks; acts under grants derived from the Sponsor's authority; MUST NOT create sub-workers unless separately authorized.
+- **Relationships:** belongs to exactly one Organization; has exactly one Human or Employee Sponsor; works for one purpose and one or more bounded Tasks; acts under grants derived from the Sponsor's authority; MUST NOT create sub-workers unless separately authorized. After expiry, completion, revocation, or archival, its historical identity remains resolvable by Events, Decisions, Artifacts, and Audit Records.
 
 ### Role
 
@@ -133,6 +146,10 @@ Ownership means constitutional control and accountability, not technical possess
 - **Relationships:** issues attributable system Commands; subscribes to Events; acts only under explicit authority; is reviewed by an accountable Human or Employee.
 
 ## 3. Work entities
+
+### Work Root
+
+A Work Root is the exclusive purpose anchor for a Task or Action. Every Task and Action MUST reference exactly one of `goal_id` or `duty_reference`; it MUST NOT reference both and MUST NOT reference neither. `goal_id` identifies an active Goal. A `duty_reference` MUST identify the duty type; the governing Policy, constitutional provision, Incident, compliance obligation, or maintenance mandate; its accountable issuer or owner; its scope; and its review or completion condition. A Work Root is a typed reference contract, not a separate owned lifecycle entity. It preserves the same authority, resource, evidence, and audit traceability for duty-rooted work as for Goal-rooted work.
 
 ### Mission
 
@@ -177,14 +194,14 @@ Ownership means constitutional control and accountability, not technical possess
 
 - **Purpose:** Represent an assignable, bounded unit of work.
 - **Description:** The smallest governed work unit scheduled by the kernel. It states expected output and acceptance, not an unrestricted instruction.
-- **Required attributes:** common attributes; `goal_id`; `title`; `description`; `issuer_actor_id`; `assignee_actor_id` or assignable Role; `inputs`; `expected_outputs`; `acceptance_criteria`; `authority_requirement`; `budget_ids`; `risk_class`; `reversibility`; `due_or_review_at`.
-- **Optional attributes:** `objective_ids`; `project_id`; dependencies; plan position; Tool eligibility; approval references; retry limit.
-- **Immutable fields:** `task_id`, `goal_id`, organization membership, original issuer, creation metadata.
-- **Mutable fields:** assignee, detailed scope within the Goal, dependencies, budgets, schedule, progress, outputs, lifecycle state. Changing the Goal creates a new Task.
+- **Required attributes:** common attributes; exactly one Work Root (`goal_id` XOR `duty_reference`); `title`; `description`; `issuer_actor_id`; `assignee_actor_id` or assignable Role; `inputs`; `expected_outputs`; `acceptance_criteria`; `authority_requirement`; `budget_ids`; `risk_class`; `reversibility`; `due_or_review_at`.
+- **Optional attributes:** `objective_ids` and `project_id` only for Goal-rooted work; dependencies; plan position; Tool eligibility; approval references; retry limit.
+- **Immutable fields:** `task_id`, Work Root, organization membership, original issuer, creation metadata.
+- **Mutable fields:** assignee, detailed scope within the Work Root, dependencies, budgets, schedule, progress, outputs, lifecycle state. Changing the Work Root creates a new Task.
 - **Globally unique identifier:** `task_id`.
-- **Ownership:** Organization through exactly one Goal.
+- **Ownership:** Organization through exactly one Work Root.
 - **Lifecycle state:** `proposed`, `ready`, `assigned`, `in_progress`, `blocked`, `suspended`, `completed`, `failed`, `cancelled`, `archived`.
-- **Relationships:** belongs to exactly one Goal and optionally one Project; may advance Objectives; assigned to an Actor; consumes Resources and Budgets; invokes Tools; emits Events; produces Artifacts and Memory Records.
+- **Relationships:** belongs to exactly one Work Root; a Goal-rooted Task may optionally belong to one Project and advance Objectives; assigned to an Actor; consumes Resources and Budgets; invokes Tools; emits Events; produces Artifacts and Memory Records.
 
 ### Project
 
@@ -216,7 +233,7 @@ Ownership means constitutional control and accountability, not technical possess
 
 - **Purpose:** Represent an attempted organizational state change or consequential external effect.
 - **Description:** A bounded operation by an Actor, using zero or more Tools, distinct from the Command requesting it and Events recording its attempt and result.
-- **Required attributes:** common attributes; `actor_id`; Goal or duty reference; `task_id` when applicable; `authority_grant_id`; action type; inputs; affected Resource references; risk; reversibility; expected cost; required Approval references; attempt and result Event references.
+- **Required attributes:** common attributes; `initiating_actor_id`; exactly one Work Root (`goal_id` XOR `duty_reference`); `task_id` when applicable; `authority_grant_id`; action type; inputs; affected Resource references; risk; reversibility; expected cost; required Approval references; attempt and result Event references.
 - **Optional attributes:** Tool invocations; compensation plan; external idempotency key; Decision and Incident references.
 - **Immutable fields:** `action_id`, Actor, purpose trace, initial scope, organization membership, creation metadata.
 - **Mutable fields:** attempt, verification, compensation, and result status only through Events.
@@ -231,8 +248,8 @@ Ownership means constitutional control and accountability, not technical possess
 
 - **Purpose:** Express attributable intent for the kernel to evaluate an operation.
 - **Description:** A request, not a fact or permission. Its normative envelope and disposition are defined in `EVENT_MODEL.md`.
-- **Required attributes:** `command_id`; type and schema version; `issued_at`; `organization_id`; `actor_id`; correlation and causation; target and Resource references; Goal, Task, or duty; asserted authority and Approvals; operation, inputs, constraints, and idempotency key.
-- **Optional attributes:** evidence and confidence; deadline; parent workflow reference.
+- **Required attributes:** `command_id`; type and schema version; `issued_at`; `organization_id`; exactly one `initiating_actor_id`; `correlation_id`; target and Resource references; Work Root or target Task; asserted authority and Approvals; operation, inputs, constraints, and idempotency key.
+- **Optional attributes:** `participating_actor_ids`; `approver_actor_ids`; `reviewer_actor_ids`; `governing_body_id`; individual vote or disposition records; evidence and confidence; deadline; parent workflow or external trigger reference.
 - **Immutable fields:** all fields after submission; resubmission creates a new Command with the same idempotency key where appropriate.
 - **Mutable fields:** none; disposition is derived from Events.
 - **Globally unique identifier:** `command_id`.
@@ -244,40 +261,42 @@ Ownership means constitutional control and accountability, not technical possess
 
 - **Purpose:** Preserve an immutable assertion about an accepted command, observation, result, or state transition.
 - **Description:** The canonical coordination and history fact. Event semantics are defined in `EVENT_MODEL.md`.
-- **Required attributes:** `event_id`; `event_type`; `timestamp`; `organization_id`; `actor_id`; `originating_command_id`; `correlation_id`; nullable `causation_id`; `resource_references`; `result`; `supporting_evidence`; `confidence`; `payload`; `schema_version`.
-- **Optional attributes:** subject references; policy evaluation; authority, approval, Goal, Task, Tool, and incident references; integrity proof.
+- **Required attributes:** `event_id`; `event_type`; `timestamp`; `organization_id`; exactly one `initiating_actor_id`; exactly one `recording_command_id`; `correlation_id`; nullable `causal_reference`; `resource_references`; `result`; `supporting_evidence`; `epistemic_status`; `payload`; `schema_version`.
+- **Optional attributes:** `confidence` when epistemically applicable; `participating_actor_ids`; `approver_actor_ids`; `reviewer_actor_ids`; `governing_body_id`; individual vote or disposition records; subject references; policy evaluation; authority, Approval, Work Root, Task, Tool, and Incident references; integrity proof.
 - **Immutable fields:** all fields after acceptance. Corrections are new Events.
 - **Mutable fields:** none.
 - **Globally unique identifier:** `event_id`.
 - **Ownership:** Organization whose stream contains it.
 - **Lifecycle state:** `recorded`; an Event may later be marked logically superseded by another Event but is never mutated or deleted from history.
-- **Relationships:** caused by exactly one accepted Command; emitted for an Actor or trusted Service; references affected entities; may cause later Events; contributes to Audit Records and derived state.
+- **Relationships:** admitted or generated through exactly one recording Command and technically initiated by exactly one Actor; may record a distinct external or internal cause through `causal_reference`; references affected entities; may lead to later Commands and Events; contributes to Audit Records and derived state.
 
 ### Decision
 
 - **Purpose:** Record selection or rejection of a consequential course of action.
 - **Description:** An attributable evaluation of alternatives against evidence, Policy, authority, cost, risk, and expected benefit. Its minimum format is defined in `DECISION_RECORD.md`.
-- **Required attributes:** common attributes; all fields required by `DECISION_RECORD.md`, including `decision_type`, `goal_id` or governance duty, `decider_actor_id`, `authority_grant_id`, alternatives, pinned evidence, confidence, risks, expected benefit and cost, reversibility, approval requirement, and outcome.
-- **Optional attributes:** Task, Project, Objective, Incident, and external commitment references; dissent.
-- **Immutable fields:** `decision_id`, organization membership, decider, decision time, recorded alternatives and evidence versions. Amendments are new Decisions linked by supersession.
+- **Required attributes:** common attributes; all fields required by `DECISION_RECORD.md`, including `decision_type`, exactly one Work Root, `initiating_actor_id`, individual decider or collective disposition records, `authority_grant_id`, alternatives, pinned evidence, confidence, risks, expected benefit and cost, reversibility, approval requirement, and outcome.
+- **Optional attributes:** `participating_actor_ids`; `reviewer_actor_ids`; `governing_body_id`; Task, Project, Objective, Incident, and external commitment references; dissent.
+- **Immutable fields:** `decision_id`, organization membership, individual decider or collective disposition records, decision time, recorded alternatives and evidence versions. Amendments are new Decisions linked by supersession.
 - **Mutable fields:** review date, result metrics, lessons learned, status through append-only updates.
 - **Globally unique identifier:** `decision_id`.
 - **Ownership:** Organization; accountability remains with the authorized decider and, where applicable, approving Human.
 - **Lifecycle state:** `proposed`, `pending_approval`, `approved`, `rejected`, `executed`, `reviewed`, `superseded`, `archived`.
-- **Relationships:** serves a Goal or governance duty; made by an Actor under authority; references Policies and Evidence; is referenced by every Approval; may authorize or reject an Action and generate follow-up Tasks.
+- **Relationships:** serves exactly one Work Root; technically initiated by one Actor; decided by one authorized Actor or derived from individually attributable collective dispositions under current Policy; references Policies and Evidence; is referenced by every Approval; may authorize or reject an Action and generate follow-up Tasks.
 
 ### Approval
 
 - **Purpose:** Record an eligible approver's disposition of one Decision or exact bounded action class.
 - **Description:** Specific, informed, attributable, time-bounded authorization. Approval does not expand the approver's authority and is not itself an Authority Grant except where an explicitly authorized policy defines the bounded grant produced by approval.
-- **Required attributes:** common attributes; `decision_id`; `requester_actor_id`; `approver_actor_id`; `approver_authority_grant_id`; `disposition`; `scope`; `conditions`; `effective_at`; `expires_at` or expiry condition; `decision_version`; `policy_ids`.
-- **Optional attributes:** budget ceiling; assumption set; reason for denial; separation-of-duties evidence; resulting grant reference.
+- **Required attributes:** common attributes; `decision_id`; `requester_actor_id`; `initiating_actor_id`; one `approver_actor_id` or individually attributable `approver_actor_ids`; `approver_authority_grant_id` references; `disposition`; `approval_mode` (`single_use`, `bounded_repeat`, or `standing`); `used_count`; `effective_at`; `expires_at` or explicit expiry condition; `conditions`; `revocation_triggers`; applicable action, Resource, risk, and budget scope; `decision_version`; `policy_ids`.
+- **Optional attributes:** `usage_limit` only where not fixed by mode; `review_schedule`; `governing_body_id`; individual vote or disposition records; budget ceiling; assumption set; reason for denial; separation-of-duties evidence; resulting grant reference.
 - **Immutable fields:** `approval_id`, decision and requester references, organization membership, creation metadata. Disposition is append-corrected, never overwritten.
-- **Mutable fields:** lifecycle state only through expiry, invalidation, or revocation Events; conditions may be narrowed but not expanded without a new Approval.
+- **Mutable fields:** `used_count`; lifecycle state through use, expiry, invalidation, or revocation Events; conditions and scope may be narrowed but not expanded without a new Approval.
 - **Globally unique identifier:** `approval_id`.
 - **Ownership:** Organization; accountable approver owns the disposition responsibility.
-- **Lifecycle state:** `requested`, `under_review`, `granted`, `denied`, `expired`, `revoked`, `invalidated`, `archived`.
-- **Relationships:** references exactly one Decision; requested by an Actor; decided by an eligible Actor; evaluated under Policies; may satisfy a condition on an Authority Grant or Action.
+- **Lifecycle state:** `requested`, `under_review`, `granted`, `consumed`, `denied`, `expired`, `revoked`, `invalidated`, `archived`.
+- **Relationships:** references exactly one Decision; requested and technically initiated by attributable Actors; decided by an eligible Actor or valid collective process; evaluated under Policies; may satisfy a condition on an Authority Grant or Action but remains distinct from Authority.
+
+Approval-mode semantics are fixed. `single_use` has an effective usage limit of one and is consumed by one authorized execution. `bounded_repeat` requires a positive `usage_limit` and remains usable only until the earliest limit, expiry, revocation, invalidation, or other condition. `standing` requires a `review_schedule` and applies only to a narrowly defined recurring class of A2 activity permitted by Policy; it MUST NOT authorize A4 matters or broadly authorize unspecified A3 actions. Every use increments `used_count`, remains individually attributable, and is independently checked against current Authority, Policy, budget, conditions, and scope. Material changes invalidate the Approval.
 
 ### Proposal
 
@@ -296,7 +315,7 @@ Ownership means constitutional control and accountability, not technical possess
 
 - **Purpose:** Route exactly one Decision to an eligible approver for an exact disposition.
 - **Description:** The workflow entity that establishes what is being asked, by whom, of whom, and by when. It is not the Approval disposition.
-- **Required attributes:** common attributes; `decision_id` and version; `requester_actor_id`; eligible approver Actor or Role; exact requested disposition; review package; policy basis; deadline.
+- **Required attributes:** common attributes; `decision_id` and version; `requester_actor_id`; eligible approver Actor, Role, or Governing Body; proposed `approval_mode`, usage and scope constraints; exact requested disposition; review package; policy basis; deadline.
 - **Optional attributes:** escalation route; reminder schedule; confidentiality handling; related requests.
 - **Immutable fields:** `approval_request_id`, Decision version, requester, requested disposition, organization membership, creation metadata.
 - **Mutable fields:** eligible routing and deadline only within Policy; material request change creates a new request; lifecycle state.
@@ -521,7 +540,7 @@ Ownership means constitutional control and accountability, not technical possess
 
 - **Purpose:** Provide an append-only, reviewable reconstruction of consequential organizational activity.
 - **Description:** An integrity-preserving projection that connects Commands, Events, Actors, Roles, Goals or duties, authority, Policies, Evidence, Decisions, Approvals, Tools, Resources, actions, and results. It may use protected references instead of disclosing content.
-- **Required attributes:** common attributes; `subject_reference`; `event_ids`; `originating_command_ids`; `actor_ids`; `authority_grant_ids`; `goal_or_duty_reference`; `policy_ids`; `evidence_ids`; `decision_ids`; `approval_ids`; affected Resource references; Tool invocations; result references; `integrity_reference`.
+- **Required attributes:** common attributes; `subject_reference`; `event_ids`; `recording_command_ids`; initiating, participating, approving, and reviewing Actor references as applicable; `governing_body_id` and individual dispositions where applicable; `authority_grant_ids`; Work Root; `policy_ids`; `evidence_ids`; `decision_ids`; `approval_ids`; affected Resource references; Tool invocations; result and causal references; `integrity_reference`.
 - **Optional attributes:** Incident reference; protected-content pointers; review annotation; export manifest.
 - **Immutable fields:** `audit_record_id`, incorporated facts and references, creation metadata. Later facts append a new segment or version; prior material is unchanged.
 - **Mutable fields:** access classification, lawful redaction pointers, review status, retention metadata.
@@ -535,6 +554,8 @@ Ownership means constitutional control and accountability, not technical possess
 ```mermaid
 erDiagram
     ORGANIZATION ||--o{ ACTOR : governs
+    ORGANIZATION ||--o{ GOVERNING_BODY : constitutes
+    GOVERNING_BODY }o--o{ HUMAN : comprises
     ACTOR ||--o| HUMAN : "may be"
     ACTOR ||--o| EMPLOYEE : "may be"
     ACTOR ||--o| TEMPORARY_WORKER : "may be"
@@ -544,7 +565,10 @@ erDiagram
     ORGANIZATION ||--o{ GOAL : owns
     GOAL ||--o{ OBJECTIVE : contains
     GOAL ||--o{ PROJECT : contains
-    GOAL ||--o{ TASK : owns
+    GOAL o|--|| WORK_ROOT : "may anchor"
+    DUTY_REFERENCE o|--|| WORK_ROOT : "may anchor"
+    WORK_ROOT ||--o{ TASK : owns
+    WORK_ROOT ||--o{ ACTION : governs
     PROJECT ||--o{ TASK : coordinates
     ACTOR ||--o{ TASK : performs
     ACTOR ||--o{ AUTHORITY_GRANT : receives
@@ -556,7 +580,7 @@ erDiagram
     TASK }o--o{ TOOL : invokes
     ACTOR ||--o{ EVENT : originates
     EVENT }o--|| TASK : concerns
-    DECISION }o--|| GOAL : serves
+    DECISION }o--|| WORK_ROOT : serves
     DECISION }o--|| AUTHORITY_GRANT : relies_on
     DECISION ||--o{ APPROVAL : receives
     POLICY }o--o{ DECISION : governs
@@ -573,4 +597,4 @@ erDiagram
     ORGANIZATION ||--o{ AUDIT_RECORD : owns
 ```
 
-Cardinalities express the governing minimum. Optional links do not relax invariants in `INVARIANTS.md`.
+`WORK_ROOT` is the exclusive typed reference contract defined above, and `DUTY_REFERENCE` denotes its complete duty form. Exactly one of Goal or Duty Reference anchors each Work Root. Cardinalities express the governing minimum. Optional links do not relax invariants in `INVARIANTS.md`.

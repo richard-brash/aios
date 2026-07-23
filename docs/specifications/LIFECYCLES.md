@@ -5,7 +5,7 @@
 
 ## 1. Common transition rules
 
-Lifecycle state is derived exclusively from Events. A transition is legal only when this document permits it, its originating Command is authorized, all referenced entities are in compatible states, required Policy and Approval checks pass, and all invariants remain true. The kernel MUST reject every unspecified transition.
+Lifecycle state is derived exclusively from Events. A transition is legal only when this document permits it, its recording Command is authorized, all referenced entities are in compatible states, required Policy and Approval checks pass, and all invariants remain true. The kernel MUST reject every unspecified transition.
 
 `archived` is nonoperational retention. `deleted` means protected content has been lawfully removed and a minimal tombstone remains. `suspended` prevents new operational work but preserves identity, duties, evidence, and accountability. `expired` is automatic termination by a predeclared time or condition. `revoked` is an active withdrawal by eligible authority. `completed` records satisfaction of declared completion criteria and is not synonymous with deletion.
 
@@ -36,7 +36,8 @@ stateDiagram-v2
     Deleted --> [*]
 ```
 
-- `Proposed -> Active`, mission or governance change implicit in activation, and every transition to `Dissolving` are Human-reserved.
+- Organization bootstrap atomically establishes the Organization, initiating verified Human Actor, constitutional owner or governor Role, Human Role Assignment, founding Decision, initial Grants, founding Events, and Audit Record references. No operational Command is legal before it completes, and bootstrap authority ends with establishment.
+- `Proposed -> Active`, mission or governance change implicit in activation, and every transition to `Dissolving` are Human-reserved. Initial activation occurs only as the final state of a complete bootstrap transaction; later transitions follow ordinary rules.
 - `Active -> Suspended` is Authorized only for eligible human governance or emergency safety control; emergency use requires Incident review.
 - `Suspended -> Active` is Human-reserved and requires documented remediation.
 - `Dissolving -> Archived` is Human-reserved and requires legal, commitment, asset, records, and retention checks.
@@ -90,6 +91,7 @@ stateDiagram-v2
 - Restoration is Policy-required and cannot occur while the Sponsor or worker Grant is inactive.
 - Completion is Authorized when the completion condition is evidenced. Expiry is Automatic at the earliest time or condition. Neither can be extended retroactively; new work requires a new worker or authorized new grant before expiry.
 - Terminal states cannot return to active. Archival occurs only after result handoff, resource reconciliation, and credential revocation.
+- Expiry, completion, revocation, and archival end operational availability but never delete or reuse the worker's persistent Actor identity. Historical Events, Decisions, Artifacts, and Audit Records MUST continue to resolve it.
 
 ## 5. Goal
 
@@ -141,7 +143,7 @@ stateDiagram-v2
     Cancelled --> Archived: TaskArchived
 ```
 
-- Acceptance requires exactly one active Goal, bounded outputs and criteria, risk and reversibility classification, authority requirement, and resource limits.
+- Acceptance requires exactly one Work Root: either one active `goal_id` or one complete `duty_reference`, never both or neither. A duty reference identifies duty type, governing Policy, constitutional provision, Incident, compliance obligation, or maintenance mandate, accountable issuer or owner, scope, and review or completion condition. Acceptance also requires bounded outputs and criteria, risk and reversibility classification, authority requirement, and resource limits.
 - Assignment is Authorized only to an eligible active Actor or Role and never transfers authority. Start requires the assignee's active Grant and required Approvals.
 - Blocking reports an unmet dependency; suspension prevents new work due to governance, safety, authority, Policy, or resource conditions. Resume is Policy-required when suspension arose from an Incident, revocation, expired Approval, or safety control; otherwise it is Authorized after revalidation.
 - Completion requires result evidence and acceptance-criteria evaluation; consequential outputs require the Decision and Approval specified by Policy. Failure records attempted work and effects.
@@ -159,20 +161,25 @@ stateDiagram-v2
     Granted --> Expired: ApprovalExpired
     Granted --> Revoked: ApprovalRevoked
     Granted --> Invalidated: ApprovalInvalidated
+    Granted --> Granted: ApprovalUseRecorded
     Requested --> Invalidated: ApprovalInvalidated
     UnderReview --> Invalidated: ApprovalInvalidated
     Denied --> Archived: ApprovalArchived
     Expired --> Archived: ApprovalArchived
     Revoked --> Archived: ApprovalArchived
     Invalidated --> Archived: ApprovalArchived
-    Granted --> Archived: ApprovalConsumedAndArchived
+    Granted --> Consumed: SingleUseApprovalConsumed
+    Consumed --> Archived: ApprovalArchived
 ```
 
-- A request requires exactly one recorded Decision, exact requested disposition, alternatives, evidence, benefit, cost, risks, reversibility, and eligible approver route.
+- A request requires exactly one recorded Decision, exact requested disposition, alternatives, evidence, benefit, cost, risks, reversibility, eligible approver route, and proposed `approval_mode`. Every granted Approval records `used_count`, effective and expiry conditions, conditions, revocation triggers, and applicable action, Resource, risk, and budget scope.
 - Only an eligible Actor whose authority covers the Decision may grant or deny. Self-approval of A3 is prohibited unless a narrow explicit low-risk Policy permits it; A4 always requires the responsible Human authority.
 - Grant requires an informed, specific disposition before execution. Denial and nonresponse confer no authority.
-- Expiry is Automatic. Revocation is Authorized by the approver or superior eligible authority. Material change to scope, cost, risk, evidence, assumptions, Policy, or Decision version invalidates the Approval automatically.
-- A granted Approval may be archived after its approved operation is completed, but its effect and evidence remain auditable.
+- A `single_use` Approval has an effective usage limit of one and transitions to `consumed` when its one authorized execution is recorded, then to archival. A `bounded_repeat` Approval requires a positive `usage_limit` and remains granted only until that limit, expiry, revocation, invalidation, or another condition is reached. Each use increments `used_count` atomically.
+- A `standing` Approval requires a review schedule and applies only to a narrowly defined recurring class of A2 activity expressly permitted by Policy. It MUST NOT authorize A4 matters or broadly authorize unspecified A3 actions.
+- Every use is independently attributable and rechecked against current Authority, Policy, budget, Decision assumptions, scope, risk, Resources, conditions, and revocation triggers. Approval remains distinct from Authority.
+- Expiry and satisfaction of a use limit are Automatic. Revocation is Authorized by the approver or superior eligible authority. Material change to scope, cost, risk, evidence, assumptions, Policy, Decision version, or recurring action class invalidates the Approval automatically.
+- A bounded or standing Approval may be archived only after expiry, revocation, invalidation, or authorized retirement; its uses, effect, and evidence remain auditable.
 
 ## 8. Authority Grant
 

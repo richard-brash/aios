@@ -13,11 +13,13 @@ Accepted Events MUST be append-only. Correction, reversal, supersession, redacti
 
 **Why:** Immutable facts make attribution, dispute resolution, tamper detection, recovery, and chronological reconstruction possible. Mutable history lets operational power rewrite accountability.
 
-## 3. State is derived from Events
+## 3. Authoritative AIOS state is derived from Events
 
-Durable state MUST be a deterministic projection of the ordered Event stream. Caches, indexes, snapshots, conversations, model context, external systems, and administrative views are not independent sources of truth.
+All authoritative AIOS governance and lifecycle state MUST be derivable from Events. External systems may retain their own authoritative domain state, but AIOS MUST record the references, observations, integrity information, and reconciliation status required for governance and audit.
 
-**Why:** One authoritative history prevents contradictory state and allows projections to be rebuilt, verified, migrated, and replaced.
+This requirement covers AIOS governance, identity, authority, lifecycle, decision, resource-accounting, memory, and audit state. Artifact content stores, credential stores, search indexes, transient caches, model context, vendor platforms, banking systems, and external communication systems may retain specialized state. AIOS MUST preserve stable references, observed or reconciled versions, integrity identifiers, ownership, authority, classification, provenance, relevant external observations, reconciliation status, and Decision and audit linkage. Replay reconstructs AIOS projections and references without external effects; it does not pretend to reconstruct inaccessible external systems.
+
+**Why:** One authoritative governance history prevents contradictory AIOS state and allows its projections to be rebuilt, verified, migrated, and replaced without duplicating every byte in connected systems.
 
 ## 4. The kernel is deterministic
 
@@ -57,7 +59,7 @@ Actors, Tools, Credentials, subscriptions, memory retrieval, and Resources MUST 
 
 ## 10. Auditability is a first-class outcome
 
-Every consequential operation MUST produce a reconstructable trace from Goal or duty and originating Command through Actor, Role, authority, Policy, evidence, Decision, Approval, Tool, Resource effects, Events, and result. Protected content may use controlled references, but required accountability cannot disappear.
+Every consequential operation MUST produce a reconstructable trace from exactly one Work Root and recording Command through initiating and participating Actors, causal reference, Role, authority, Policy, evidence, Decision, Approval, Tool, Resource effects, Events, and result. Protected content may use controlled references, but required accountability cannot disappear.
 
 **Why:** Humans can govern autonomous work only when they can establish what happened, why, under whose authority, at what cost, and with what outcome.
 
@@ -71,6 +73,8 @@ Coordination between kernel, Employees, Tools, humans, and services SHOULD occur
 
 The system MUST route A4 and constitutionally reserved A3 Decisions to eligible Humans, preserve meaningful review, and provide suspension, appeal, and amendment mechanisms. AI recommendations may inform but MUST NOT impersonate or substitute for accountable human disposition.
 
+Collective governance MUST preserve one technical initiating Actor plus each Human's individually attributable disposition, current Policy for eligibility, quorum, conflicts, and voting, and the derived collective outcome. A Governing Body MUST NOT be modeled as a fictional Human, and initiation alone confers no deciding authority.
+
 **Why:** Law and the Constitution reserve ownership, fiduciary accountability, amendments, and material human-impact powers to Humans. Automation cannot confer those powers on itself.
 
 ## 13. Small composable services
@@ -81,7 +85,7 @@ Services SHOULD have narrow responsibilities, explicit versioned contracts, inde
 
 ## 14. The kernel owns orchestration
 
-The kernel MUST own Command admission, identity attribution, Policy and authority evaluation, lifecycle transition validation, event ordering, idempotency, resource enforcement, approval gating, subscription authorization, and audit linkage. The kernel MUST NOT own domain reasoning or silently perform Employee work.
+The kernel MUST own Command admission, singular technical initiation plus participant attribution, recording-command and causal-reference separation, Policy and authority evaluation, Work Root validation, lifecycle transition validation, event ordering, idempotency, resource enforcement, approval-mode and usage gating, subscription authorization, bootstrap atomicity, and audit linkage. The kernel MUST NOT own domain reasoning or silently perform Employee work.
 
 **Why:** Central ownership of governance semantics prevents each worker or Tool from interpreting constitutional boundaries differently, while keeping the kernel small and deterministic.
 
@@ -90,6 +94,8 @@ The kernel MUST own Command admission, identity attribution, Policy and authorit
 Employees, not the kernel, are accountable institutional Actors for planning, evidence gathering, proposals, Task execution, Tool selection within eligibility, result assessment, and escalation. Model instances assist an Employee but do not replace its identity or accountability.
 
 **Why:** Separating governed orchestration from accountable work avoids a monolithic agent and preserves clear responsibility when models or Tools change.
+
+Every Task and Action MUST have exactly one Work Root: either an active Goal or a complete governance, safety, compliance, or maintenance duty reference, never both or neither. Duty-rooted work receives the same authority, evidence, resource, lifecycle, Decision, and audit controls as Goal-rooted work.
 
 ## 16. Organizations own Policy
 
@@ -138,11 +144,13 @@ Organizations MUST be able to export and migrate identities, Events, Policies, G
 An implementation conforms only if it can demonstrate, with deterministic and adversarial tests, that:
 
 - unauthorized, stale, expired, revoked, over-budget, and invalidly approved Commands fail closed;
-- replay reconstructs equivalent state without external effects;
+- replay reconstructs equivalent authoritative AIOS projections and governed external references without external effects or pretending to reconstruct external systems;
 - model replacement preserves identity, authority, memory, and audit continuity;
 - suspension prevents new affected work and preserves evidence;
 - every consequential operation is reconstructable using `DECISION_RECORD.md`;
 - deletion and redaction obey retention, legal-hold, provenance, and tombstone rules; and
 - failures cannot bypass organization, authority, Policy, resource, or human-reserved boundaries.
+
+Bootstrap conformance additionally requires one atomic constitutional transaction to establish the Organization, verified initiating Human Actor, constitutional owner or governor Role, Role Assignment, founding Decision, initial Grants, founding Events, and Audit Record references before operational Commands are admitted. Reusable Approvals conform only when mode, usage, expiry, conditions, revocation, review, and per-use current-state checks remain enforceable and separate from Authority.
 
 Passing a test suite does not permit deviation from the Constitution or the normative contracts in this specification.

@@ -26,7 +26,8 @@ class StoredIdempotency:
 class InMemoryStore:
     def __init__(self, fault=Fault.NONE):
         self._lock=Lock(); self.fault=fault; self.streams={}; self.dispositions={}; self.audits={}; self.tasks={}
-        self.idempotency={}; self.resource_transitions=[]; self.approval_use_transitions=[]; self.append_calls=0
+        self.idempotency={}; self.resource_transitions=[]; self.approval_use_transitions=[]
+        self.append_calls=0; self.builder_calls=0
 
     @staticmethod
     def _scope_key(scope):
@@ -47,10 +48,6 @@ class InMemoryStore:
     def inspect_idempotency(self, scope, fingerprint):
         return self._inspect_unlocked(scope, fingerprint)
 
-    def enforce_idempotency(self, scope, fingerprint):
-        with self._lock:
-            return self._inspect_unlocked(scope, fingerprint)
-
     @staticmethod
     def _duplicate_result(existing):
         original=existing.disposition
@@ -60,31 +57,39 @@ class InMemoryStore:
             original.event_ids if isinstance(original,Accepted) else ())
         return TransactionResult(TransactionStatus.PREVIOUSLY_ADMITTED,duplicate,None)
 
-    def append(self, tx):
+    def append_new(self, *, organization_id, stream_id, scope, fingerprint,
+                   expected_prior_position, build_transaction):
         with self._lock:
             self.append_calls += 1
-            reg=tx.idempotency_registration
-            if reg is not None:
-                inspection=self._inspect_unlocked(reg.scope,reg.fingerprint)
-                existing=self.idempotency.get(self._scope_key(reg.scope))
-                if inspection.state is IdempotencyState.EXACT:
-                    return self._duplicate_result(existing)
-                if inspection.state is IdempotencyState.CONFLICT:
-                    return TransactionResult(TransactionStatus.IDEMPOTENCY_CONFLICT,None,ReasonCode.IDEMPOTENCY_CONFLICT)
-                if inspection.state is IdempotencyState.UNCERTAIN:
-                    return TransactionResult(TransactionStatus.OUTCOME_UNCERTAIN,None,ReasonCode.RECONCILIATION_REQUIRED,
-                        authoritative_mutation_may_have_occurred=inspection.authoritative_mutation_may_have_occurred,
-                        internal_reconciliation_metadata_recorded=inspection.internal_reconciliation_metadata_recorded,
-                        reconciliation_reference=inspection.reconciliation_reference)
-            stream=tuple(self.streams.get(tx.organization_id, ()))
-            if self.fault is Fault.CONCURRENCY or len(stream)!=tx.expected_prior_position:
+            inspection=self._inspect_unlocked(scope,fingerprint)
+            existing=self.idempotency.get(self._scope_key(scope))
+            if inspection.state is IdempotencyState.EXACT:
+                return self._duplicate_result(existing)
+            if inspection.state is IdempotencyState.CONFLICT:
+                return TransactionResult(TransactionStatus.IDEMPOTENCY_CONFLICT,None,ReasonCode.IDEMPOTENCY_CONFLICT)
+            if inspection.state is IdempotencyState.UNCERTAIN:
+                return TransactionResult(TransactionStatus.OUTCOME_UNCERTAIN,None,ReasonCode.RECONCILIATION_REQUIRED,
+                    authoritative_mutation_may_have_occurred=inspection.authoritative_mutation_may_have_occurred,
+                    internal_reconciliation_metadata_recorded=inspection.internal_reconciliation_metadata_recorded,
+                    reconciliation_reference=inspection.reconciliation_reference)
+            stream=tuple(self.streams.get(organization_id, ()))
+            if self.fault is Fault.CONCURRENCY or len(stream)!=expected_prior_position:
                 return TransactionResult(TransactionStatus.CONCURRENCY_CONFLICT,None,ReasonCode.STREAM_CONCURRENCY_CONFLICT)
+            try:
+                self.builder_calls += 1
+                tx=build_transaction()
+            except Exception:
+                return TransactionResult(TransactionStatus.APPEND_FAILURE,None,ReasonCode.APPEND_FAILED)
+            reg=tx.idempotency_registration
+            if (tx.organization_id != organization_id or tx.stream_id != stream_id or
+                tx.expected_prior_position != expected_prior_position or reg is None or
+                reg.scope != scope or reg.fingerprint != fingerprint):
+                return TransactionResult(TransactionStatus.VALIDATION_FAILURE,None,ReasonCode.INTEGRITY_VERIFICATION_FAILED)
             if self.fault in {Fault.APPEND_FAILURE,Fault.PROJECTION_FAILURE,Fault.AUDIT_FAILURE,Fault.IDEMPOTENCY_FAILURE}:
                 return TransactionResult(TransactionStatus.APPEND_FAILURE,None,ReasonCode.APPEND_FAILED)
             if self.fault is Fault.UNCERTAIN_BEFORE:
-                if reg:
-                    self.idempotency[self._scope_key(reg.scope)]=StoredIdempotency(
-                        reg.fingerprint,tx.disposition,True,False,True)
+                self.idempotency[self._scope_key(reg.scope)]=StoredIdempotency(
+                    reg.fingerprint,tx.disposition,True,False,True)
                 return TransactionResult(TransactionStatus.OUTCOME_UNCERTAIN,None,ReasonCode.APPEND_OUTCOME_UNCERTAIN,
                     authoritative_mutation_may_have_occurred=False,
                     internal_reconciliation_metadata_recorded=True,
@@ -98,10 +103,9 @@ class InMemoryStore:
             self.tasks[tx.organization_id]=new_tasks
             self.resource_transitions.extend(tx.resource_transitions)
             self.approval_use_transitions.extend(tx.approval_use_transitions)
-            if reg:
-                self.idempotency[self._scope_key(reg.scope)]=StoredIdempotency(
-                    reg.fingerprint,tx.disposition,self.fault is Fault.UNCERTAIN_AFTER,
-                    self.fault is Fault.UNCERTAIN_AFTER,self.fault is Fault.UNCERTAIN_AFTER)
+            self.idempotency[self._scope_key(reg.scope)]=StoredIdempotency(
+                reg.fingerprint,tx.disposition,self.fault is Fault.UNCERTAIN_AFTER,
+                self.fault is Fault.UNCERTAIN_AFTER,self.fault is Fault.UNCERTAIN_AFTER)
             if self.fault is Fault.UNCERTAIN_AFTER:
                 return TransactionResult(TransactionStatus.OUTCOME_UNCERTAIN,None,ReasonCode.APPEND_OUTCOME_UNCERTAIN,
                     authoritative_mutation_may_have_occurred=True,

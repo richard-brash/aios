@@ -70,10 +70,9 @@ class CreateTaskAdmission:
         for gate in GATE_ORDER:
             result = self._evaluate_gate(gate, command, snapshot, evaluation_time, tuple(results), scope, fingerprint)
             if gate is GateName.IDEMPOTENCY and result is None:
-                # Preflight is advisory; the locked check is authoritative and append
-                # repeats it before mutation to close the NEW-to-append race.
-                self._store.inspect_idempotency(scope, fingerprint)
-                inspection = self._store.enforce_idempotency(scope, fingerprint)
+                # This avoids needless later evaluation when possible. It is advisory:
+                # append_new repeats both idempotency and concurrency checks atomically.
+                inspection = self._store.inspect_idempotency(scope, fingerprint)
                 if inspection.state is IdempotencyState.EXACT:
                     original = inspection.original_disposition
                     if not isinstance(original, (Accepted, Rejected)):
@@ -172,35 +171,43 @@ class CreateTaskAdmission:
         if reservation: types.append("ResourceReserved")
         if approval: types.append("ApprovalUsed")
         types.append("AuditLinked")
-        disposition_id,audit_id,event_ids=self._allocate(len(types))
-        events=[]
-        for index,(kind,eid) in enumerate(zip(types,event_ids),1):
-            payload={"task_id":command.proposed_task_id,"decision_id":command.submission.decision_reference}
-            if kind=="TaskCreated": payload.update(title=command.title,purpose=command.purpose,lifecycle_state="proposed",entity_version=1)
-            events.append(create_authoritative_event(command=command,snapshot=context.snapshot,evaluation_time=context.evaluation_time,
-                event_id=eid,stream_position=context.snapshot.stream_position+index,event_type=kind,audit_id=audit_id,
-                payload=payload,work_root=command.work_root))
-        denv=KernelDispositionEnvelope(disposition_id,"Accepted",context.snapshot.organization_id,
-            command.submission.envelope.initiating_actor_id,command.submission.command_id,
-            command.submission.envelope.correlation_id,context.evaluation_time,command.submission.envelope.classification,audit_id)
-        accepted=Accepted(denv,event_ids,"Task recorded in proposed state",FrozenMap({"task_version":1}))
-        audit=AuditRecord(audit_id,context.snapshot.organization_id,command.submission.command_id,context.gate_results,"accepted",IntegrityReference(f"integrity:{audit_id}"))
-        reg=IdempotencyRegistration(scope,fingerprint,disposition_id)
-        projection=FrozenMap({"task_id":command.proposed_task_id})
-        return self._store.append(KernelTransaction(context.snapshot.organization_id,StreamId(f"organization:{context.snapshot.organization_id}"),
-            command.expected_stream_position,tuple(events),accepted,audit,reg,projection,tuple(reservation),tuple(approval)))
+        stream_id=StreamId(f"organization:{context.snapshot.organization_id}")
+        def build_transaction():
+            disposition_id,audit_id,event_ids=self._allocate(len(types))
+            events=[]
+            for index,(kind,eid) in enumerate(zip(types,event_ids),1):
+                payload={"task_id":command.proposed_task_id,"decision_id":command.submission.decision_reference}
+                if kind=="TaskCreated": payload.update(title=command.title,purpose=command.purpose,lifecycle_state="proposed",entity_version=1)
+                events.append(create_authoritative_event(command=command,snapshot=context.snapshot,evaluation_time=context.evaluation_time,
+                    event_id=eid,stream_position=context.snapshot.stream_position+index,event_type=kind,audit_id=audit_id,
+                    payload=payload,work_root=command.work_root))
+            denv=KernelDispositionEnvelope(disposition_id,"Accepted",context.snapshot.organization_id,
+                command.submission.envelope.initiating_actor_id,command.submission.command_id,
+                command.submission.envelope.correlation_id,context.evaluation_time,command.submission.envelope.classification,audit_id)
+            accepted=Accepted(denv,event_ids,"Task recorded in proposed state",FrozenMap({"task_version":1}))
+            audit=AuditRecord(audit_id,context.snapshot.organization_id,command.submission.command_id,context.gate_results,"accepted",IntegrityReference(f"integrity:{audit_id}"))
+            reg=IdempotencyRegistration(scope,fingerprint,disposition_id)
+            return KernelTransaction(context.snapshot.organization_id,stream_id,command.expected_stream_position,
+                tuple(events),accepted,audit,reg,FrozenMap({"task_id":command.proposed_task_id}),tuple(reservation),tuple(approval))
+        return self._store.append_new(organization_id=context.snapshot.organization_id,stream_id=stream_id,
+            scope=scope,fingerprint=fingerprint,expected_prior_position=command.expected_stream_position,
+            build_transaction=build_transaction)
 
     def _record_rejection(self, command,snapshot,when,results,scope,fingerprint,failure):
-        disposition_id,audit_id,event_ids=self._allocate(1)
-        event=create_authoritative_event(command=command,snapshot=snapshot,evaluation_time=when,event_id=event_ids[0],
-            stream_position=snapshot.stream_position+1,event_type="CommandRejected",audit_id=audit_id,
-            payload={"failed_gate":failure.gate.value,"reason_code":failure.reason_code.value},work_root=command.work_root)
-        denv=KernelDispositionEnvelope(disposition_id,"Rejected",snapshot.organization_id,
-            command.submission.envelope.initiating_actor_id,command.submission.command_id,
-            command.submission.envelope.correlation_id,when,command.submission.envelope.classification,audit_id)
-        rejected=Rejected(denv,failure.reason_code,failure.gate.value,failure.safe_explanation)
-        audit=AuditRecord(audit_id,snapshot.organization_id,command.submission.command_id,results,"rejected",IntegrityReference(f"integrity:{audit_id}"))
-        reg=(None if failure.reason_code is ReasonCode.IDEMPOTENCY_CONFLICT else
-             IdempotencyRegistration(scope,fingerprint,disposition_id))
-        return self._store.append(KernelTransaction(snapshot.organization_id,StreamId(f"organization:{snapshot.organization_id}"),
-            snapshot.stream_position,(event,),rejected,audit,reg,None))
+        stream_id=StreamId(f"organization:{snapshot.organization_id}")
+        def build_transaction():
+            disposition_id,audit_id,event_ids=self._allocate(1)
+            event=create_authoritative_event(command=command,snapshot=snapshot,evaluation_time=when,event_id=event_ids[0],
+                stream_position=snapshot.stream_position+1,event_type="CommandRejected",audit_id=audit_id,
+                payload={"failed_gate":failure.gate.value,"reason_code":failure.reason_code.value},work_root=command.work_root)
+            denv=KernelDispositionEnvelope(disposition_id,"Rejected",snapshot.organization_id,
+                command.submission.envelope.initiating_actor_id,command.submission.command_id,
+                command.submission.envelope.correlation_id,when,command.submission.envelope.classification,audit_id)
+            rejected=Rejected(denv,failure.reason_code,failure.gate.value,failure.safe_explanation)
+            audit=AuditRecord(audit_id,snapshot.organization_id,command.submission.command_id,results,"rejected",IntegrityReference(f"integrity:{audit_id}"))
+            reg=IdempotencyRegistration(scope,fingerprint,disposition_id)
+            return KernelTransaction(snapshot.organization_id,stream_id,snapshot.stream_position,
+                (event,),rejected,audit,reg,None)
+        return self._store.append_new(organization_id=snapshot.organization_id,stream_id=stream_id,
+            scope=scope,fingerprint=fingerprint,expected_prior_position=snapshot.stream_position,
+            build_transaction=build_transaction)

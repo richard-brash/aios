@@ -32,8 +32,11 @@ authoritative state without external effects.
 Admission binds one immutable Command, one authoritative evaluation time, one
 coherent snapshot generation, and evidence-bearing gate results. Gate evaluation
 and Event construction are deterministic and mutation-free. The only mutation
-boundary is one call carrying the complete `KernelTransaction` to the atomic
-append port.
+boundary is one deferred append call. It carries the bound idempotency and
+stream preconditions plus a deterministic, zero-argument transaction builder.
+The builder closes only over the already evaluated immutable admission inputs
+and the injected identifier allocator; it performs no governance reads or
+organizational mutation.
 
 ### Port boundaries
 
@@ -52,13 +55,19 @@ Exhaustion fails before append with a safe internal failure.
 
 ### Event-store abstraction and atomic recording
 
-The store receives expected Organization stream position, ordered Events,
-disposition, audit record, idempotency registration, projection input, Resource
-transitions, and Approval-use transitions as one transaction. Confirmation,
-concurrency conflict, validation failure, append failure, and uncertain outcome
-remain distinct. Acceptance and rejection Events share their audit record. No
-projection, reservation, Approval use, or idempotency record becomes visible on
-a confirmed precommit failure.
+The store receives the idempotency scope and fingerprint, expected Organization
+stream position, and deferred builder. Under one atomic boundary it first
+determines that the registration is new and the stream position is current. It
+then invokes the builder exactly once to allocate identifiers and construct the
+complete immutable transaction containing ordered Events, disposition, audit,
+idempotency registration, projection input, Resource transitions, and
+Approval-use transitions. This callback shape is a reference technique, not a
+normative cross-language API.
+
+Confirmation, concurrency conflict, validation failure, append failure, and
+uncertain outcome remain distinct. Acceptance and rejection Events share their
+audit record. No projection, reservation, Approval use, or idempotency record
+becomes visible on a confirmed precommit failure.
 
 ### Idempotency and optimistic concurrency
 
@@ -76,10 +85,19 @@ An exact duplicate returns `PreviouslyAdmitted` with the original disposition
 identity, time, Event IDs, and result and allocates nothing. Conflicting reuse
 returns `IDEMPOTENCY.CONFLICT` without replacing the original registration. An
 uncertain prior outcome blocks retry until reconciliation. Preflight inspection
-is advisory. The store checks the registration under its atomic lock before
-stream concurrency validation and mutation, then registers the fingerprint in
-the same commit as Events, audit, projection, Resources, and Approval use.
-Existing authoritative registrations are never overwritten.
+is advisory. Under its atomic lock, the store checks the registration and stream
+position before invoking transaction materialization. Exact duplicate,
+conflicting fingerprint, uncertain prior registration, and concurrency conflict
+therefore allocate no disposition, audit, or Event identifiers. For a new,
+concurrency-valid registration, the store invokes materialization and registers
+the fingerprint in the same commit as Events, audit, projection, Resources, and
+Approval use. Existing authoritative registrations are never overwritten.
+
+Failures detected after materialization may consume values from the injected
+allocator even when no authoritative state commits. This slice does not claim
+identifier rollback; a future allocator could add transactional reservation or
+rollback without changing the no-allocation guarantee for outcomes determined
+before materialization.
 
 Uncertain results separately report whether authoritative organizational state
 may have changed, whether internal reconciliation-safety metadata was recorded,
@@ -100,8 +118,9 @@ Organization and Actor as well as operation family and key.
 Granular gates preserve the normative `KERNEL_CONTRACT.md` order: structural
 parse; operation/schema version; Organization; identity; idempotency; Authority;
 Policy; Work Root; Decision and Approval; target/lifecycle/concurrency and
-Incident suspension; Resources; final invariant; identifier allocation; Event
-and audit construction; atomic append. Split gate names retain precise audit
+Incident suspension; Resources; final invariant; atomic idempotency and stream
+checks; deferred identifier allocation, Event and audit construction; commit.
+Split gate names retain precise audit
 evidence without changing the governing logical sequence. The first decisive
 failure stops later evaluation. Unavailable and indeterminate governance never
 become permission.

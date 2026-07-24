@@ -5,14 +5,15 @@ import dataclasses
 import unittest
 
 from aios_kernel.gates import GATE_ORDER, GateName
-from aios_kernel.idempotency import semantic_command_fingerprint, semantic_command_identity
+from aios_kernel.idempotency import IdempotencyScope, semantic_command_fingerprint, semantic_command_identity
 from aios_kernel.reference import InMemoryStore, deny
+from aios_kernel.reference.in_memory_store import StoredIdempotency
 from aios_kernel.transaction import TransactionStatus
 from aios_protocol.commands import ResourceDimension, ResourceEstimate
 from aios_protocol.dispositions import PreviouslyAdmitted
 from aios_protocol.identifiers import (
     ActorId, ApprovalId, AuthorityGrantId, DecisionId, GoalId,
-    MessageId, OrganizationId, ResourceId,
+    MessageId, OrganizationId, ResourceId, StreamId,
 )
 from aios_protocol.reason_codes import ReasonCode
 from aios_protocol.validation import FrozenMap
@@ -68,6 +69,32 @@ class SemanticCommandIdentityTests(unittest.TestCase):
 
 
 class AtomicIdempotencyTests(unittest.TestCase):
+    @staticmethod
+    def _allocation_counts(ids):
+        return tuple(ids.calls.count(kind) for kind in ("disposition","audit","event"))
+
+    @staticmethod
+    def _store_state(store, organization_id=OrganizationId("org-1")):
+        return (
+            tuple(store.stream(organization_id)),dict(store.audits),tuple(store.task_projection(organization_id)),
+            tuple(store.resource_transitions),tuple(store.approval_use_transitions),dict(store.idempotency),
+        )
+
+    @staticmethod
+    def _race_store(stored):
+        class InsertAtAppendStore(InMemoryStore):
+            def __init__(self):
+                super().__init__(); self.pending=stored; self.inserted=False
+            def inspect_idempotency(self, scope, fingerprint):
+                from aios_kernel.idempotency import IdempotencyInspection, IdempotencyState
+                return IdempotencyInspection(IdempotencyState.NEW)
+            def append_new(self, **kwargs):
+                if not self.inserted:
+                    self.idempotency[self._scope_key(kwargs["scope"])]=self.pending
+                    self.inserted=True
+                return super().append_new(**kwargs)
+        return InsertAtAppendStore()
+
     def test_gate_order_is_complete_and_explicit(self):
         self.assertEqual(GATE_ORDER,(
             GateName.STRUCTURE,GateName.SUPPORTED_OPERATION,GateName.ORGANIZATION,
@@ -84,6 +111,12 @@ class AtomicIdempotencyTests(unittest.TestCase):
         self.assertIsInstance(duplicate.disposition,PreviouslyAdmitted)
         self.assertEqual(state,(len(store.stream(cmd.submission.envelope.organization_id)),len(store.audits),len(store.dispositions),tuple(store.resource_transitions),tuple(store.approval_use_transitions),len(ids.calls)))
         self.assertEqual(duplicate.disposition.original_disposition_id,original.disposition.envelope.message_id)
+
+    def test_preflight_duplicate_does_not_advance_any_allocator_class(self):
+        app,store,ids,cmd=engine(); app.admit(cmd); before=self._allocation_counts(ids)
+        state=self._store_state(store); app.admit(cmd)
+        self.assertEqual(self._allocation_counts(ids),before)
+        self.assertEqual(self._store_state(store),state)
 
     def test_exact_duplicate_after_rejection_returns_original(self):
         evaluator=deny(GateName.POLICY,ReasonCode.POLICY_DENIED)
@@ -104,16 +137,64 @@ class AtomicIdempotencyTests(unittest.TestCase):
         self.assertIs(store.idempotency[key],original)
         self.assertEqual((len(store.stream(OrganizationId("org-1"))),len(store.audits),len(store.tasks[OrganizationId("org-1")])),(5,1,1))
 
-    def test_stale_preflight_cannot_bypass_atomic_check(self):
-        class StalePreflightStore(InMemoryStore):
-            def inspect_idempotency(self, scope, fingerprint):
-                from aios_kernel.idempotency import IdempotencyInspection, IdempotencyState
-                return IdempotencyInspection(IdempotencyState.NEW)
-        store=StalePreflightStore(); first,_,_,cmd=engine(store=store); first.admit(cmd)
-        changed=dataclasses.replace(cmd,title="Race loser")
-        second,_,_,_=engine(cmd=changed,snap=dataclasses.replace(snapshot(),stream_position=5),store=store)
-        self.assertEqual(second.admit(changed).status,TransactionStatus.IDEMPOTENCY_CONFLICT)
-        self.assertEqual(len(store.stream(OrganizationId("org-1"))),5)
+    def test_exact_duplicate_inserted_after_preflight_allocates_nothing(self):
+        donor,donor_store,_,cmd=engine(); donor.admit(cmd)
+        stored=next(iter(donor_store.idempotency.values())); store=self._race_store(stored)
+        app,_,ids,_=engine(store=store); before=self._store_state(store)
+        result=app.admit(cmd)
+        self.assertEqual(result.status,TransactionStatus.PREVIOUSLY_ADMITTED)
+        self.assertEqual(self._allocation_counts(ids),(0,0,0))
+        self.assertEqual(store.builder_calls,0)
+        self.assertEqual(self._store_state(store)[:-1],before[:-1])
+
+    def test_conflict_inserted_after_preflight_allocates_nothing(self):
+        donor,donor_store,_,original=engine(); donor.admit(original)
+        stored=next(iter(donor_store.idempotency.values())); store=self._race_store(stored)
+        changed=dataclasses.replace(original,title="Race loser")
+        app,_,ids,_=engine(cmd=changed,store=store); result=app.admit(changed)
+        self.assertEqual(result.status,TransactionStatus.IDEMPOTENCY_CONFLICT)
+        self.assertEqual(self._allocation_counts(ids),(0,0,0)); self.assertEqual(store.builder_calls,0)
+        self.assertEqual(next(iter(store.idempotency.values())),stored)
+        self.assertFalse(store.streams); self.assertFalse(store.audits); self.assertFalse(store.tasks)
+        self.assertFalse(store.resource_transitions); self.assertFalse(store.approval_use_transitions)
+
+    def test_uncertain_registration_inserted_after_preflight_allocates_nothing(self):
+        donor,donor_store,_,cmd=engine(); donor.admit(cmd)
+        known=next(iter(donor_store.idempotency.values()))
+        uncertain=StoredIdempotency(known.fingerprint,known.disposition,True,False,True)
+        store=self._race_store(uncertain); app,_,ids,_=engine(store=store)
+        result=app.admit(cmd)
+        self.assertEqual(result.status,TransactionStatus.OUTCOME_UNCERTAIN)
+        self.assertEqual(self._allocation_counts(ids),(0,0,0)); self.assertEqual(store.builder_calls,0)
+        self.assertEqual(next(iter(store.idempotency.values())),uncertain)
+        self.assertFalse(store.streams); self.assertFalse(store.audits); self.assertFalse(store.tasks)
+
+    def test_concurrency_conflict_precedes_builder_and_allocation(self):
+        from aios_kernel.reference import Fault
+        app,store,ids,cmd=engine(fault=Fault.CONCURRENCY,reservation="r",approval="a")
+        result=app.admit(cmd)
+        self.assertEqual(result.status,TransactionStatus.CONCURRENCY_CONFLICT)
+        self.assertEqual(self._allocation_counts(ids),(0,0,0)); self.assertEqual(store.builder_calls,0)
+        self.assertFalse(store.streams); self.assertFalse(store.audits); self.assertFalse(store.tasks)
+        self.assertFalse(store.resource_transitions); self.assertFalse(store.approval_use_transitions); self.assertFalse(store.idempotency)
+
+    def test_new_transaction_builds_once_and_uses_allocated_ids(self):
+        app,store,ids,cmd=engine(); result=app.admit(cmd)
+        self.assertEqual(store.builder_calls,1); self.assertEqual(self._allocation_counts(ids),(1,1,5))
+        events=store.stream(OrganizationId("org-1")); audit=next(iter(store.audits.values()))
+        self.assertEqual(result.disposition.envelope.message_id,MessageId("disp-0"))
+        self.assertEqual(audit.audit_record_id,events[0].audit_record_id)
+        self.assertEqual(tuple(event.event_id for event in events),tuple(result.disposition.event_ids))
+
+    def test_builder_failure_leaves_store_unchanged(self):
+        store=InMemoryStore(); scope=IdempotencyScope(OrganizationId("org-1"),ActorId("actor-1"),"CreateTask","idem-1")
+        calls=[]
+        def fail_builder(): calls.append("called"); raise RuntimeError("safe synthetic failure")
+        result=store.append_new(organization_id=OrganizationId("org-1"),stream_id=StreamId("organization:org-1"),
+            scope=scope,fingerprint="fingerprint",expected_prior_position=0,build_transaction=fail_builder)
+        self.assertEqual(result.status,TransactionStatus.APPEND_FAILURE); self.assertEqual(calls,["called"])
+        self.assertEqual(store.builder_calls,1); self.assertFalse(store.streams); self.assertFalse(store.audits)
+        self.assertFalse(store.tasks); self.assertFalse(store.idempotency)
 
     def test_uncertain_before_metadata_distinguishes_state_domains(self):
         from aios_kernel.reference import Fault

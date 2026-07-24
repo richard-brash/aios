@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
+from typing import Callable
 from aios_protocol.dispositions import Accepted, AdmissionDisposition, Rejected
 from aios_protocol.events import EventRecord
 from aios_protocol.identifiers import AuditRecordId, CommandId, IntegrityReference, OrganizationId, StreamId
@@ -37,6 +38,8 @@ class KernelTransaction:
         object.__setattr__(self, "events", tuple(self.events))
         object.__setattr__(self, "resource_transitions", tuple(self.resource_transitions))
         object.__setattr__(self, "approval_use_transitions", tuple(self.approval_use_transitions))
+
+TransactionBuilder = Callable[[], KernelTransaction]
 
 class TransactionStatus(str, Enum):
     CONFIRMED="confirmed"; CONCURRENCY_CONFLICT="concurrency_conflict"; VALIDATION_FAILURE="validation_failure"

@@ -20,6 +20,16 @@ store boundary rechecks and registers this fingerprint with the Event, audit,
 projection, Resource, and Approval mutations. Duplicate, conflicting, and
 uncertain registrations cannot be overwritten.
 
+The atomic store checks idempotency and stream concurrency before it invokes a
+deterministic deferred transaction builder. Consequently, an exact duplicate,
+conflicting fingerprint, uncertain prior registration, or concurrency conflict
+creates no candidate records and allocates no disposition, audit, or Event IDs.
+Only a new, concurrency-valid registration reaches the builder, which allocates
+through the injected allocator and returns the complete immutable transaction.
+The callback is a reference implementation technique, not a normative API.
+Infrastructure failure after the builder runs may consume allocator values even
+when nothing commits; this slice intentionally provides no identifier rollback.
+
 Uncertain transaction results distinguish possible authoritative organizational
 mutation, internal reconciliation metadata, and possible external domain
 mutation. This slice has no external domain effects; uncertainty-before-commit

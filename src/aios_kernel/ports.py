@@ -2,10 +2,10 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
-from aios_protocol.identifiers import ActorId, OrganizationId
+from aios_protocol.identifiers import ActorId, OrganizationId, StreamId
 from .gates import GateName, GateResult
 from .snapshots import SnapshotResult
-from .transaction import KernelTransaction, TransactionResult
+from .transaction import TransactionBuilder, TransactionResult
 
 class SnapshotReader(Protocol):
     def bind(self, organization_id: OrganizationId, actor_id: ActorId) -> SnapshotResult: ...
@@ -48,8 +48,10 @@ class GovernancePorts:
 
 class AtomicAppendStore(Protocol):
     def inspect_idempotency(self, key: "IdempotencyScope", fingerprint: str) -> "IdempotencyInspection": ...
-    def enforce_idempotency(self, key: "IdempotencyScope", fingerprint: str) -> "IdempotencyInspection": ...
-    def append(self, transaction: KernelTransaction) -> TransactionResult: ...
+    def append_new(self, *, organization_id: OrganizationId, stream_id: StreamId,
+                   scope: "IdempotencyScope", fingerprint: str,
+                   expected_prior_position: int,
+                   build_transaction: TransactionBuilder) -> TransactionResult: ...
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:

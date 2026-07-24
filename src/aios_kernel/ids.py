@@ -1,0 +1,9 @@
+"""Authoritative identifier-allocation port."""
+from __future__ import annotations
+from typing import Protocol
+from aios_protocol.identifiers import AuditRecordId, EventId, MessageId
+
+class IdentifierAllocator(Protocol):
+    def disposition_id(self) -> MessageId: ...
+    def event_id(self) -> EventId: ...
+    def audit_id(self) -> AuditRecordId: ...

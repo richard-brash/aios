@@ -10,6 +10,8 @@ This document defines the canonical logical records exchanged at AIOS kernel bou
 
 This protocol refines [`ENTITY_MODEL.md`](ENTITY_MODEL.md), [`EVENT_MODEL.md`](EVENT_MODEL.md), [`LIFECYCLES.md`](LIFECYCLES.md), [`INVARIANTS.md`](INVARIANTS.md), [`DECISION_RECORD.md`](DECISION_RECORD.md), [`ARCHITECTURE_PRINCIPLES.md`](ARCHITECTURE_PRINCIPLES.md), [`KERNEL_CONTRACT.md`](KERNEL_CONTRACT.md), and [`KERNEL_CONFORMANCE.md`](KERNEL_CONFORMANCE.md). Those documents and the Constitution control on conflict.
 
+In this protocol, **Employee** means the constitutional AI Employee and excludes Human Actors. A model instance is a replaceable computational Resource, never an Actor, accountable decider, approver, or Authority holder.
+
 Every conforming boundary MUST preserve these principles:
 
 - every message has one stable `message_id`, stable `message_type`, and explicit version;
@@ -62,14 +64,16 @@ Every logical field has exactly one presence state. An implementation may encode
 | `known(value)` | Value is present and asserted or authoritative according to field trust | Validate type, source, scope, and integrity |
 | `unknown` | Value should exist but is not known | MUST NOT be treated as empty, false, zero, valid, or not applicable |
 | `not_yet_known` | Value is expected only after a later boundary or observation | Preserve pending state and required follow-up |
-| `not_applicable` | Field has no meaning for this record subtype | Validator confirms inapplicability; caller cannot use it to avoid a required value |
+| `not_applicable` | The selected schema classifies the field `explicitly_not_applicable` for this concrete record | Validator confirms that classification; producer cannot use it to avoid a required value or decorate an optional/prohibited field |
 | `intentionally_empty` | Applicable collection was evaluated and contains no entries | Preserve explicit empty meaning and evaluation basis |
 | `withheld(classification, reference)` | Value exists but disclosure is not authorized | Preserve governed reference, classification, and accountable withholding basis |
 | `redacted(tombstone_reference)` | Previously recorded value was lawfully removed or obscured | Preserve nonreconstructive tombstone and audit linkage |
 | `externally_unavailable(reference)` | External source could not provide the value | Preserve external reference, failure observation, and reconciliation requirement |
 | `conflicted(evidence_references)` | Material contradictory values remain unresolved | Preserve every claim and evidence relationship; do not select silently |
 
-Omission is permitted only when the record contract marks a field prohibited or the presence state is represented separately and unambiguously. A generic null without a preserved presence state is nonconforming.
+A field schema has exactly one applicability classification for each concrete record: `required`, `optional`, `prohibited`, or `explicitly_not_applicable`. An optional field may be absent. A required field appears with `known`, `unknown`, or `not_yet_known` only when that presence state is permitted by the selected subtype; unknown is not omission. A field classified `explicitly_not_applicable` uses the defined `not_applicable` presence form only when the schema requires an explicit marker. A prohibited field MUST NOT appear, even empty or `not_applicable`. A generic null without a preserved presence state is nonconforming.
+
+Ceremonial `not_applicable`, fabricated confidence, placeholder Evidence, generic empty results, and empty arrays used to evade required semantics are invalid. `intentionally_empty` is permitted only for an applicable collection that was actually evaluated and whose empty result is itself meaningful.
 
 ## 3. Common logical envelope
 
@@ -85,7 +89,7 @@ Payload data MUST NOT override envelope attribution, Organization, evaluation ti
 
 ### 3.2 Envelope field contract
 
-Applicability abbreviations are `CMD` Command, `DSP` disposition, `EVT` Event, `APP` append, `PRJ` projection, `RPL` replay, `SUB` subscription/schedule, `TLR` Tool/reconciliation, `RES` Resource/Approval, `MEM` memory/audit, `BTS` bootstrap, `OPS` operational control, and `VER` version/failure. Cells use the words `required`, `conditional`, and `prohibited`; unlisted families permit a field only when their subtype explicitly requires it.
+Applicability abbreviations are `CMD` Command, `DSP` disposition, `EVT` Event, `APP` append, `PRJ` projection, `RPL` replay, `SUB` subscription/schedule, `TLR` Tool/reconciliation, `RES` Resource/Approval, `MEM` memory/audit, `BTS` bootstrap, `OPS` operational control, and `VER` version/failure. A cell may name mechanically decidable subtype rules, but after selecting the record type, schema version, payload type/version, traffic mode, consequence class, and named subtype conditions, each field MUST resolve to exactly one of `required`, `optional`, `prohibited`, or `explicitly_not_applicable`. There is no unresolved conditional applicability state. Unlisted fields are prohibited unless the selected subtype schema explicitly classifies them otherwise.
 
 | Field | Meaning | Supplier and validation | Applicability | Mutability and replay | Security significance |
 |---|---|---|---|---|---|
@@ -93,48 +97,52 @@ Applicability abbreviations are `CMD` Command, `DSP` disposition, `EVT` Event, `
 | `message_type` | Stable unambiguous type name | Record producer; validated against selected family/type version | required: all | Immutable; historical interpretation uses recorded version | Prevents type confusion |
 | `schema_version` | Logical record-type schema version | Producer; negotiation and validator constrain | required: all | Immutable; replay uses historical semantics | Prevents downgrade/reinterpretation |
 | `organization_id` | Sole Organization scope | Caller assertion then kernel validation; kernel result copies validated value | required: all except pre-org BTS/platform security | Immutable; replay preserves | Primary tenancy and authority boundary |
-| `initiating_actor_id` | One technical initiating Actor | Caller assertion plus invocation proof; kernel resolves | required: CMD, OPS; conditional: others; pre-org BTS resolves verified Human within transaction | Immutable; replay preserves | Attribution; not automatically decider |
-| `participant_actor_ids` | Other attributable participants | Caller asserts; kernel validates each | conditional: CMD, DSP, EVT, MEM, OPS | Immutable per message; replay preserves | Collective accountability, no authority aggregation |
-| `recording_command_id` | Command through which authoritative mutation was admitted | Kernel binds Events/mutations to admitted Command; caller may reference for result reports | required: EVT, APP and authoritative RES, MEM, OPS; conditional: TLR; prohibited: initial CMD | Immutable; replay preserves | Mutation provenance, distinct from cause |
-| `causal_reference` | Typed cause/trigger of underlying occurrence | Caller or adapter asserts with evidence; kernel validates type/provenance | conditional: all operational families | Immutable assertion; corrections append | Prevents recording/cause conflation |
-| `correlation_id` | End-to-end governed case or operation group | Caller supplies or kernel binds at bootstrap/system origin | required: CMD, DSP, EVT, TLR, SUB, OPS; conditional: others | Immutable; replay preserves | Must not authorize cross-org correlation access |
-| `causation_message_id` | Immediately preceding protocol message in message-flow lineage | Producer supplies; kernel validates existence and Organization | conditional: all | Immutable; replay preserves | Flow lineage, not real-world causal proof |
-| `idempotency_key` | Organization-scoped operation deduplication key | Caller supplies for mutating request; kernel scopes and compares full operation | required: CMD, BTS, materialization, retry; conditional: others | Immutable; replay does not reacquire | Cross-org isolation; conflict fails closed |
-| `issued_at` | Producer-asserted issue time | Producer; kernel treats as observation, not authoritative evaluation | required: requests; conditional: reports | Immutable; replay preserves | Cannot determine authority expiry alone |
+| `initiating_actor_id` | One technical initiating Actor | Caller assertion plus invocation proof; kernel resolves | required: CMD, OPS; BTS requires verified founding Human; other subtype schemas resolve optional or prohibited | Immutable; replay preserves | Attribution; not automatically decider |
+| `participant_actor_ids` | Other attributable participants | Caller asserts; kernel validates each | optional only for CMD, DSP, EVT, MEM, OPS subtypes that admit participants; prohibited otherwise | Immutable per message; replay preserves | Collective accountability, no authority aggregation |
+| `recording_command_id` | Command through which authoritative mutation was admitted | Kernel binds Events/mutations to admitted Command; caller may reference for result reports | required: EVT, APP and authoritative RES, MEM, OPS; Tool/result subtype schema resolves required or optional; prohibited: initial CMD | Immutable; replay preserves | Mutation provenance, distinct from cause |
+| `causal_reference` | Typed cause/trigger of underlying occurrence | Caller or adapter asserts with evidence; kernel validates type/provenance | required when the subtype records a caused/observed occurrence; explicitly_not_applicable for independently initiated internal Command; prohibited where no causal semantics exist | Immutable assertion; corrections append | Prevents recording/cause conflation |
+| `correlation_id` | End-to-end governed case or operation group | Caller supplies or kernel binds at bootstrap/system origin | required: CMD, DSP, EVT, TLR, SUB, OPS; other subtype schemas resolve optional or prohibited | Immutable; replay preserves | Must not authorize cross-org correlation access |
+| `causation_message_id` | Immediately preceding protocol message in message-flow lineage | Producer supplies; kernel validates existence and Organization | required when a declared message-flow predecessor exists; explicitly_not_applicable for independently originated messages; prohibited when lineage is not represented | Immutable; replay preserves | Flow lineage, not real-world causal proof |
+| `idempotency_key` | Actor- and operation-family-scoped mutation deduplication key within one Organization | Caller supplies for mutating request; kernel scopes and compares material operation semantics | required: mutating CMD, BTS, materialization, retry; optional for explicitly idempotent read subtypes; prohibited otherwise | Immutable; replay does not reacquire | Cross-Actor/Organization isolation; conflict fails closed |
+| `issued_at` | Producer-asserted issue time | Producer; kernel treats as observation, not authoritative evaluation | required: requests; optional: reports whose schema permits producer time; prohibited otherwise | Immutable; replay preserves | Cannot determine authority expiry alone |
 | `evaluation_time` | Single authoritative admission time | Kernel-bound only | required: DSP, EVT, APP and admitted mutations; prohibited: caller requests | Immutable; replay uses recorded value | Prevents clock manipulation and nondeterminism |
-| `received_at` | Boundary-observed receipt time | Receiving boundary records as observation | conditional: all | Immutable observation; not ordering authority | Latency/audit only; external skew tolerated |
-| `stream_id` | Organization authoritative Event stream | Kernel-bound | required: EVT, APP; conditional: PRJ, RPL, SUB deliveries; prohibited: caller-chosen values | Immutable; replay selects recorded stream | Prevents stream injection |
-| `stream_position` | Kernel-assigned Event order | Kernel-bound | required: accepted EVT/deliveries; conditional: PRJ, RPL; prohibited: proposals/caller values | Immutable; replay preserves | Sole organization order authority |
-| `expected_stream_position` | Caller/preparer concurrency precondition | Caller or kernel append planner asserts; kernel compares current | required: APP; conditional: CMD, PRJ | Immutable input; replay applies historical outcome | Prevents lost update |
-| `classification` | Message/payload disclosure class | Caller asserts minimum; kernel validates and may raise, never lower without authority | required: all except negotiation; conditional: VER | Immutable for record; later reclassification Event | Disclosure and filter boundary |
-| `purpose` | Specific authorized processing purpose | Caller asserts; kernel validates against Role, Grant, Policy, subscription | required: requests/retrieval/subscription; conditional: results | Immutable; replay preserves | Purpose limitation |
-| `work_root` | Exactly one Goal or complete duty for Task/Action | Caller asserts; kernel validates exclusive form and current scope | required: work-related CMD, TLR, SUB, RES, OPS and consequential MEM; conditional: otherwise | Immutable for Task/Action; replay preserves | Prevents unrooted or dual-root work |
-| `authority_references` | Asserted relevant Grants and chain | Caller asserts; kernel resolves current validity and scope | required: consequential CMD, TLR, RES, OPS; conditional: others | Immutable snapshot references; replay historical | Presence never proves authority |
-| `policy_references` | Versions used or asserted | Caller may assert; kernel pins controlling versions | required: DSP, EVT, APP, audit; conditional: requests | Immutable once admitted; replay historical | Prevents silent current-policy reinterpretation |
-| `decision_reference` | Consequential Decision and version | Caller asserts; kernel validates completeness/current applicability | required: consequential operations; conditional: others | Immutable reference; material change new Decision | Cannot be invented by kernel |
-| `approval_references` | Approval IDs/versions/modes used | Caller asserts; kernel validates and records use | required: when Policy requires; conditional: others | Immutable per use; replay rebuilds monotonic usage | Approval never Authority |
-| `resource_references` | Resources affected or measured | Caller/adapter asserts; kernel validates scope and state | required: consequential CMD, TLR, RES, EVT; conditional: others | Immutable facts; corrections append | Reservation separate from consumption |
-| `audit_reference` | Stable audit record/segment link | Kernel derives or validates protected reference | required: authoritative consequential result; conditional: others | Immutable linkage; replay rebuilds | Missing link blocks completion |
+| `received_at` | Boundary-observed receipt time | Receiving boundary records as observation | optional only when the receiving-boundary subtype records it; prohibited otherwise | Immutable observation; not ordering authority | Latency/audit only; external skew tolerated |
+| `stream_id` | Organization authoritative Event stream | Kernel-bound | required: EVT, APP and stream-bound PRJ/RPL/SUB delivery; prohibited: caller-chosen or non-stream subtypes | Immutable; replay selects recorded stream | Prevents stream injection |
+| `stream_position` | Kernel-assigned Event order | Kernel-bound | required: accepted EVT and Event deliveries; optional for PRJ/RPL reports naming a position; prohibited: proposals/caller values | Immutable; replay preserves | Sole organization order authority |
+| `expected_stream_position` | Caller/preparer concurrency precondition | Caller or kernel append planner asserts; kernel compares current | required: APP and mutating subtype that declares optimistic concurrency; optional for eligible CMD/PRJ reads; prohibited otherwise | Immutable input; replay applies historical outcome | Prevents lost update |
+| `classification` | Message/payload disclosure class | Caller asserts minimum; kernel validates and may raise, never lower without authority | required: all except negotiation; VER subtype resolves required or prohibited | Immutable for record; later reclassification Event | Disclosure and filter boundary |
+| `purpose` | Specific authorized processing purpose | Caller asserts; kernel validates against Role, Grant, Policy, subscription | required: requests, retrieval, subscription; optional for permitted results; prohibited otherwise | Immutable; replay preserves | Purpose limitation |
+| `work_root` | Exactly one active Goal or complete duty for Task/Action | Caller asserts; kernel validates exclusive form and current scope | required: Task/Action and their work-related CMD/TLR/SUB/RES/OPS records; optional for consequential MEM when schema permits; prohibited for Project/Objective/Plan as root | Immutable for Task/Action; replay preserves | Prevents unrooted, dual-root, or invalid-kind work |
+| `authority_references` | Asserted relevant Grants and chain | Caller asserts; kernel resolves current validity and scope | required: consequential CMD, TLR, RES, OPS; optional for explicitly nonconsequential governed subtypes; prohibited otherwise | Immutable snapshot references; replay historical | Presence never proves authority |
+| `policy_references` | Named Policy content versions used or asserted | Caller may assert; kernel pins controlling versions | required: DSP, consequential EVT/APP, audit and evaluated governance result; optional for eligible requests; prohibited otherwise | Immutable once admitted; replay historical | Prevents silent current-policy reinterpretation |
+| `decision_reference` | Consequential Decision identity and `decision_content_version`/`entity_revision` | Caller asserts; kernel validates completeness/current applicability | required: consequential operations; optional for schema-permitted linkage; prohibited otherwise | Immutable reference; material change new Decision | Cannot be invented by kernel |
+| `approval_references` | Approval IDs, named revisions, and modes used | Caller asserts; kernel validates and records use | required when controlling Policy requires Approval; optional only where schema permits relevant non-use references; prohibited otherwise | Immutable per use; replay rebuilds monotonic usage | Approval never Authority |
+| `resource_references` | Resources affected or measured | Caller/adapter asserts; kernel validates scope and state | resolved by Event/record subtype: required when material, optional when relevant, explicitly_not_applicable when meaningless and declared, prohibited when forbidden | Immutable facts; corrections append | Reservation separate from consumption |
+| `audit_reference` | Stable audit record/segment link | Kernel derives or validates protected reference | required: authoritative consequential result and other subtype-mandated records; optional where schema permits; prohibited otherwise | Immutable linkage; replay rebuilds | Missing link blocks completion |
 | `payload_type` | Stable payload semantic type | Producer; validated under record type | required: payload-bearing messages | Immutable; replay historical | Blocks ambiguous payload interpretation |
 | `payload_version` | Payload schema version | Producer; negotiated/validated | required: payload-bearing messages | Immutable; replay historical | Blocks schema downgrade |
-| `payload` | Type-specific logical fields | Producer according to trust rules; kernel validates | conditional: all | Immutable message content; correction new message/Event | Cannot override trusted envelope |
-| `integrity_reference` | Integrity proof or protected digest reference | Producer supplies; receiving authority verifies | required: EVT, APP, audit, Tool evidence, checkpoints; conditional: others | Immutable; replay verifies | Tamper evidence, not semantic authority |
-| `redaction_metadata` | Withholding/redaction basis and tombstone references | Authorized governance boundary only | conditional: protected DSP, EVT, PRJ, SUB, MEM | Append-only changes; replay applies historical Events | Must not leak or erase accountability |
+| `payload` | Type-specific logical fields | Producer according to trust rules; kernel validates | required for payload-bearing subtype; prohibited for payloadless subtype | Immutable message content; correction new message/Event | Cannot override trusted envelope |
+| `integrity_reference` | Integrity proof or protected digest reference | Producer supplies; receiving authority verifies | required: EVT, APP, audit, Tool evidence, checkpoints; optional for subtype-permitted protected references; prohibited otherwise | Immutable; replay verifies | Tamper evidence, not semantic authority |
+| `redaction_metadata` | Withholding/redaction basis and tombstone references | Authorized governance boundary only | required for redacted/withheld/tombstone subtype; optional for protected subtype that permits it; prohibited otherwise | Append-only changes; replay applies historical Events | Must not leak or erase accountability |
 
 ### 3.3 Family applicability rules
 
-Every record definition below narrows this common table. A field is REQUIRED only when marked by the common table or subtype. Irrelevant fields MUST be `not_applicable` or absent under an unambiguous schema prohibition; they MUST NOT carry hidden meaning. Pre-Organization bootstrap uses `organization_id=not_yet_known` plus a proposed Organization identity in its payload. Platform-security telemetry is explicitly non-authoritative, uses a platform scope rather than an Organization stream, and MUST NOT be accepted as an AIOS Event.
+Every record definition below resolves the common rules for its concrete subtype. The selected schema publishes a mechanically evaluable applicability map; validation MUST reject an unresolved field, a missing required field, a present prohibited field even when empty, and a presence value inconsistent with its classification. Optional absence and `explicitly_not_applicable` are distinct. Pre-Organization bootstrap classifies `organization_id` as `explicitly_not_applicable` and carries the proposed stable Organization identity in its payload. Platform-security telemetry is explicitly non-authoritative, uses a platform scope rather than an Organization stream, and MUST NOT be accepted as an AIOS Event.
 
 ## 4. Versioning and negotiation
 
 Every message records:
 
-- protocol-family version;
+- `protocol_family_version`;
 - record-type `schema_version`;
 - `payload_version` where payload exists;
-- controlling Policy version references when evaluated;
-- governing specification version references; and
+- referenced entity `entity_revision` where concurrency or exact state matters;
+- explicitly named business-content version such as `decision_content_version` or Artifact content version;
+- controlling `policy_content_version` references when evaluated;
+- governing `specification_version` references;
 - migration-evidence reference if transformed.
+
+These dimensions are never interchangeable. Lifecycle state is not a version, and Organization `stream_position` is ordering rather than entity or schema revision. A field named only `version` is prohibited where more than one dimension could apply.
 
 A backward-compatible addition is optional, has an explicit presence default that cannot change existing meaning, and does not change acceptance, authority, ordering, disclosure, or lifecycle semantics for an older reader. Removing, renaming, retyping, changing requiredness, changing presence meaning, reinterpreting an enum/reason code, or changing a normative outcome is breaking and requires a new major family or record version.
 
@@ -153,11 +161,12 @@ Historical Events and replay use the schema, Policy, transition rules, and speci
 | `command_id` | Stable identity of this Command operation. Exact redelivery preserves both `command_id` and `message_id`; a permitted retry uses a new `command_id` and preserves `original_operation_id` and correlation |
 | `original_operation_id` | Stable lineage identity shared by an original operation and its separately admitted retries; prohibited from merging different requested semantics |
 | `operation_type` and `operation_version` | Exact requested operation; no free-text operation key |
-| `target_references` | Typed entity/Resource targets and expected versions |
+| `target_references` | Typed entity/Resource targets and explicitly named expected `entity_revision`, business-content version, or stream precondition |
 | `invocation_proof_reference` | Proof bound to asserted initiating Actor; not a Credential value |
-| `work_root` | Exactly one Goal or duty for every Task/Action, both/neither structurally invalid |
+| `work_root` | Exclusive union of one active Goal reference or one complete duty reference for every Task/Action; both, neither, Project-only, and Objective-only forms are structurally invalid |
+| `planning_references` | Optional subordinate Project, Objective, and Plan references; absence is valid and none is a Work Root |
 | `asserted_authority_references` | Untrusted Grant/delegation references until kernel resolution |
-| `decision_reference`, `approval_references` | Exact versions asserted for consequential/approval-gated work |
+| `decision_reference`, `approval_references` | Exact named content versions and `entity_revision` values asserted for consequential/approval-gated work |
 | `expected_resource_use` | Estimate per independently governed dimension |
 | `reservation_request` | Maximum exposure, units, aggregation keys, and release conditions |
 | `lifecycle_preconditions` | Expected entity versions, states, dependencies, and requested transition |
@@ -169,25 +178,39 @@ Historical Events and replay use the schema, Policy, transition rules, and speci
 
 The caller may assert references only. The kernel resolves Organization, identity, Role, Grants, Policies, Work Root, Decision, Approvals, Resources, lifecycle, evidence access, and current versions. It MUST reject rather than replace an invalid assertion with a broader or different one.
 
+Every mutating `CommandSubmission` has an idempotency scope containing at least `(organization_id, initiating_actor_id, operation_family, idempotency_key)`. It also binds `original_operation_id` and the canonical semantic digest or equivalent exact comparison of every material operation field. Exact redelivery returns the original disposition, identifiers, stream positions, evaluation time, Resource effects, Approval-use result, and dispatch identity. Conflicting reuse preserves the first registration, fails closed, and discloses no other Actor's operation or key use.
+
+Decision-bearing Commands use `GovernanceRoleAttribution`: `proposer_actor_ids`, `recommender_actor_ids`, `accountable_decider`, `approver_actor_ids`, `technical_recorder_actor_id`, `initiating_actor_id`, optional `governing_body_disposition`, and individually attributable participation records. Technical initiation, proposal, recommendation, recording, deciding, and Approval are distinct even when one eligible Actor fills several roles.
+
+For every A4 and Constitution- or Policy-reserved A3 Decision, `accountable_decider` resolves either to one eligible Human Actor or a valid `GoverningBodyDisposition`. An AI Employee MAY research, recommend, propose, prepare, route, or technically record, but MUST NOT occupy that accountable-decider field. A separate Human Approval does not convert an AI-authored Decision into a Human Decision. Operational Decisions validly delegated to an AI Employee remain representable.
+
+`GoverningBodyDisposition` contains stable body identity; authoritative membership snapshot references; individually attributable eligible Human vote, consent, dissent, abstention, and recusal records; each member's authority basis; named quorum-rule version; named voting-Policy version; deterministic derived result; accountable body disposition; and separate technical initiator. A body MUST NOT be encoded as one fictional Human.
+
 ## 6. Admission disposition family
 
 All dispositions contain the original `command_id`, bound `evaluation_time`, reason-code presence, and audit reference when a valid Organization recording boundary exists.
+
+For a Decision-bearing Command, every disposition also preserves the submitted and validated `GovernanceRoleAttribution` or the precise role-validation failure. Acceptance MUST NOT collapse proposer, recommender, accountable decider, approver, technical recorder, Governing Body, or initiating Actor into one generic author field.
 
 | Disposition | Required fields | Meaning and prohibited implication |
 |---|---|---|
 | `accepted` | Event IDs/bindings, assigned positions, derived target versions, committed reservations, Approval-use transition, exact authorized next step | Authorizes only the recorded next step; does not imply adapter receipt, attempt, external effect, verification, success, or lifecycle completion |
 | `rejected` | Stable reason code, failed gate, safe detail, Policy/invariant references, explicit zero mutation/effect assertions | Confers no authority; does not imply malicious intent or external nonoccurrence |
-| `previously_admitted` | Original disposition identity, Event identities/positions, original evaluation time, idempotency match proof | Is not a new acceptance and MUST NOT repeat Event, use, reservation, schedule instance, dispatch, or delivery |
+| `previously_admitted` | Original disposition identity, all identifiers and Event positions, original evaluation time, Resource effects, Approval-use result, dispatch identity, and idempotency match proof | Is not a new acceptance and MUST NOT repeat Event, use, reservation, schedule instance, dispatch, or delivery |
 | `paused` | Unresolved state, safe holding state, owner, timeout/review condition, zero implied success | Does not authorize later automatic continuation without a newly admitted Command or defined current-state revalidation |
 | `escalated` | Exact question/Decision sought, eligible Actor/Role, evidence, deadline, safe default | Nonresponse is not Approval or Authority |
 
 ## 7. Event record family
 
-`EventRecord` is immutable and contains every field required by `EVENT_MODEL.md`, including Event identity/type/version, Organization stream/position, kernel acceptance time, initiating/participating Actors, `recording_command_id`, distinct `causal_reference`, correlation, Resources, typed result, Evidence, epistemic status, conditional confidence, entity references/versions, projection effects, Approval-use effects, audit and integrity linkage.
+`EventRecord` is immutable. It contains the complete common Event envelope and every semantic field required by the selected Event-type `schema_version` and `payload_version`; optional fields appear only where allowed; prohibited fields do not appear; and explicit `not_applicable` appears only when that schema classifies the field `explicitly_not_applicable`. A prohibited field fails validation even when empty.
+
+Event-type schemas classify Resource references, supporting Evidence, result, epistemic status, confidence, projection effects, Approval-use effects, and other semantic fields independently. They are not universally required. Deterministic mechanical Events MAY omit or explicitly mark semantically meaningless fields not applicable when their schemas permit it. Consequential Events MUST contain every Evidence, result, Resource, and epistemic field material to accountability and interpretation. Missing required fields, ceremonial markers, fabricated confidence, placeholder Evidence, generic empty results, and evasive empty collections fail with the applicable Event reason code.
+
+Consequential Decision and Action Event schemas require `GovernanceRoleAttribution` sufficient to preserve the distinct initiating, participating, proposing/recommending, accountable-deciding, approving, and technical-recording roles, including the full Governing Body disposition reference when applicable.
 
 The Event `timestamp` is the kernel-recorded acceptance/occurrence-in-AIOS time and controls authoritative ordering only through its assigned stream position. A real-world `occurred_at`, `observed_at`, adapter time, or external-system time is a payload observation with source and uncertainty; it never replaces `timestamp`, `evaluation_time`, or `stream_position`.
 
-`epistemic_status` is one of `deterministic`, `observed`, `asserted`, `inferred`, `predicted`, or `disputed`. Confidence is prohibited or `not_applicable` for deterministic transitions and required for inferred, predicted, uncertain observed, and disputed assertions.
+When applicable, `epistemic_status` is one of `deterministic`, `observed`, `asserted`, `inferred`, `predicted`, or `disputed`. Confidence is omitted or explicitly not applicable for deterministic transition facts as selected by schema and required for inferred, predicted, uncertain observed, and disputed assertions. Confidence never creates authority or truth.
 
 Projection effects are declarative semantic effects, not executable code. Resource and Approval effects use their dedicated record semantics. Event payload fields cannot override envelope identity, attribution, Organization, order, time, Work Root, authority, Policy, or classification.
 
@@ -217,19 +240,31 @@ Storage uncertainty MUST NOT be represented as success or confirmed nonappend. R
 
 ## 9. Projection family
 
-`ProjectionQuery` identifies Organization, projection type/version, subject, purpose, authorization, classification ceiling, requested Event position, and consistency requirement. Callers cannot request a projection that ignores later revocation/suspension for an operational decision.
+`ProjectionQuery` identifies Organization, projection type, projection-definition version, response `schema_version`, subject, purpose, authorization, classification ceiling, requested Event `stream_position`, and consistency requirement. Callers cannot request a projection that ignores later revocation/suspension for an operational decision.
 
-`ProjectionResponse` contains source `stream_id`, last applied position, Event-history integrity reference, projection version, normative state, governed external references and reconciliation status, presence/redaction semantics, and access audit reference. `ProjectionFailure` returns a stable code for gap, unknown schema, integrity mismatch, stale state, unavailable dependency, or classification denial.
+`ProjectionResponse` contains source `stream_id`, last applied `stream_position`, Event-history integrity reference, projection-definition version, response `schema_version`, normative state with named `entity_revision`/business-content versions, governed external references and reconciliation status, presence/redaction semantics, and access audit reference. `ProjectionFailure` returns a stable code for gap, unknown schema, integrity mismatch, stale state, unavailable dependency, or classification denial.
 
 A response is not authoritative independently of its validated source history. External domain content is referenced, not fabricated or claimed reconstructed.
 
+Canonical relationship protocol is implemented within PF-05 Projection and PF-16 Audit rather than as a new top-level family:
+
+- `CanonicalRelationshipSnapshot` identifies relationship kind, canonical entity/Event references, named revisions/positions, Organization, subjects, effective state, and integrity;
+- `InverseProjectionResponse` identifies its canonical source set and last applied stream position and declares itself derived and nonauthoritative;
+- `RelationshipIntegrityComparison` compares canonical edges with inverse navigation edges without permitting the inverse to create truth;
+- `RelationshipConflict` reports stale, forged, directly edited, missing, or conflicting inverse state and fails affected eligibility/authority closed; and
+- `InverseProjectionRebuilt` proves replay-derived reconstruction from canonical entities and Events without authoritative mutation.
+
+Role Assignment is authoritative for Actor-to-Role occupancy; Authority Grant for issuer, recipient, parent, child, and delegation edges; and Governing Body membership records and accepted Events for membership. An inverse list cannot create Role eligibility, Authority, delegation rights, membership, or voting eligibility. Equal-looking projections with conflicting canonical histories are not equivalent.
+
 ## 10. Replay family
 
-`ReplayRequest` contains authorized Organization, source stream range, historical specification/schema/Policy versions, projection versions, checkpoint references, expected integrity, and `execution_mode=replay_effect_prohibited`. `ReplayAuthorization` binds requester, purpose, classification, range, side-effect guards, and permitted output.
+`ReplayRequest` contains authorized Organization, source stream range, historical `specification_version`, record `schema_version`, `payload_version`, named business-content versions, Policy versions, projection versions, checkpoint references, expected integrity, and `execution_mode=replay_effect_prohibited`. `ReplayAuthorization` binds requester, purpose, current classification/disclosure authority, range, side-effect guards, and permitted output.
 
 Every replay-family message includes `traffic_mode=replay`. A record with `traffic_mode=replay` is structurally prohibited from containing a live dispatch intent, live subscription delivery, Resource mutation request, Approval-use request, schedule materialization, external write, notification, charge, retry, or compensation.
 
-`ReplayReport` contains applied range, Event count and integrity result, checkpoint decision, reconstructed projections/references, unknown historical version failures, external-reference limitations, side-effect counter proof, and zero new authoritative Command/Event identities. `ProjectionComparison` reports semantic equivalence, permitted metadata differences, and exact divergence position.
+`ReplayReport` contains applied range, Event count and integrity result, checkpoint decision, reconstructed projections/references, governed availability state, unknown historical version failures, external-reference limitations, side-effect counter proof, and zero new authoritative Command/Event identities. `ProjectionComparison` reports semantic equivalence, permitted metadata differences, canonical relationship comparison, and exact divergence position.
+
+Replay applies later redaction, deletion, sealing, access restriction, tombstone, cryptographic erasure, and reclassification Events. `GovernedAvailabilitySnapshot` preserves minimum lawful Event identity, stream position, provenance, integrity reference, classification history, accountability metadata, and nonreconstructive tombstone/erasure state. Replay MUST NOT restore erased content, retrieve inaccessible content, disclose currently restricted content, treat historical access as current disclosure authority, or pretend to reconstruct an opaque external system. Historical schema and payload semantics govern Event interpretation; current disclosure and governance controls govern present access.
 
 ## 11. Subscription family
 
@@ -241,16 +276,18 @@ Acknowledgment records delivery identity, subscriber identity, received Event id
 
 ## 12. Scheduling family
 
+Scheduling strategy, priority selection, sequence optimization, recurrence design, planning, and Task decomposition are outside the kernel protocol. PF-08 governs schedule admission, persistence, activation, suspension, cancellation, due observation, trigger deduplication, materialization, timeout, expiry, missed-run handling under declared Policy, and current-state revalidation. The kernel MUST NOT invent priorities, reorder work, alter recurrence strategy, or choose planning strategy.
+
 Distinct record types are:
 
-- `ScheduleDefinition`: stable series identity, authorizing Actor/Decision, Work Root or governed lifecycle subject, recurrence/trigger semantics, bounds, Resources, Approval, target, catch-up Policy, cancellation and review conditions;
+- `ScheduleDefinition`: stable series identity, proposing/planning Actor references, authorizing accountable Decision, technical recorder, Work Root or governed lifecycle subject, recurrence/trigger semantics supplied by the organization, bounds, Resources, Approval, target, catch-up Policy, cancellation and review conditions;
 - `ScheduleActivated`, `ScheduleSuspended`, and `ScheduleCancelled`: lifecycle transition with recording Command, current gates, reason, and effective time;
 - `ScheduleDueObserved`: timer/deadline observation with source and bound kernel evaluation time, not permission;
-- `ScheduleInstanceMaterialization`: distinct stable instance/operation identity, series identity, due identity, new attributable Command, current Work Root and every revalidated gate;
+- `ScheduleInstanceMaterialization`: distinct stable instance/operation identity, series identity, due identity, new attributable Command, scheduler Service as technical initiator, original proposer/decider/approval references, current Work Root, and every revalidated gate;
 - `MissedInstanceDisposition`: `skipped`, `paused`, `escalated`, or `catch_up_proposed`, never guessed execution; and
 - `CatchUpDisposition`: bounded authorized instances and current Decision/Approval/Resource checks.
 
-Each legitimate instance has a distinct identity. Duplicate delivery for the same instance preserves its identity. A schedule definition cannot provide missing Authority, Approval, Work Root, Policy, Resource, or active lifecycle state.
+Each due schedule produces a new attributable Command before work or dispatch. Materialization revalidates current Actor status, Role Assignment, Authority, Policy, Work Root, Approval, Resources, lifecycle, suspension, Incident controls, and stop conditions. Each legitimate instance has a distinct identity. `ScheduleTriggerDisposition` binds series, due identity, instance identity, and Actor-scoped idempotency: exact duplicate triggers return the original materialization; conflicting triggers deduplicate, pause, or reconcile and never execute twice. A schedule cannot provide or preserve missing, expired, revoked, stale, exhausted, or cancelled authority or conditions. A scheduler Service is only the technical initiator, not automatically planner, accountable decider, approver, or authority source.
 
 ## 13. Tool dispatch, attempt, and result families
 
@@ -298,11 +335,11 @@ Reservations and consumption are distinct. Where reservation is required, consum
 
 ## 16. Approval-use family
 
-`ApprovalReferenceSnapshot` contains Approval ID/version, Decision, mode, permitted action/Resource/risk/budget scope, `used_count`, `usage_limit` presence, effective/expiry, revocation state, conditions, review schedule, approvers, Policy, and integrity.
+`ApprovalReferenceSnapshot` contains Approval ID and `entity_revision`, Decision ID and `decision_content_version`, mode, permitted action/Resource/risk/budget scope, `used_count`, `usage_limit` presence, effective/expiry, revocation state, conditions, review schedule, approvers, named Policy content versions, and integrity.
 
-`ApprovalUseValidation` records current Authority separately, Decision version, every condition, material-change result, separation of duties, current bound time, remaining use, and result. A successful validation is not Authority.
+`ApprovalUseValidation` records current Authority separately, Decision `decision_content_version` and `entity_revision`, every condition, material-change result, separation of duties, current bound time, remaining use, and result. A successful validation is not Authority.
 
-`ApprovalUseRecorded` is an atomic append transition with use ID, Command, Approval version, mode, prior/next monotonic `used_count`, exact operation scope, and Event/audit references. `single_use` moves 0→1; `bounded_repeat` increments below its positive limit; `standing` records each narrowly scoped current A2 use. Usage never decrements, including uncertain external outcomes. A4 standing use and unspecified A3 standing use are invalid.
+`ApprovalUseRecorded` is an atomic append transition with use ID, Command, Approval `entity_revision`, mode, prior/next monotonic `used_count`, exact operation scope, and Event/audit references. `single_use` moves 0→1; `bounded_repeat` increments below its positive limit; `standing` records each narrowly scoped current A2 use. Usage never decrements, including uncertain external outcomes. A4 standing use and unspecified A3 standing use are invalid.
 
 ## 17. Memory family
 
@@ -317,19 +354,29 @@ Logical records include:
 - `MemorySuperseded` and `MemoryConflictMarked`: preserve all historical Records and links;
 - `MemoryRedaction`, `MemoryDeletionRequest`, `MemoryLegalHold`, and `MemoryTombstoneCreated`: exact authority, scope, dependencies, retention/hold decision, propagation, nonreconstructive tombstone, and audit.
 
+Protected-reference and memory lifecycle records carry `GovernedAvailabilitySnapshot` links so later sealing, access restriction, reclassification, deletion, redaction, tombstone, or cryptographic erasure changes availability without rewriting accepted history. A resolver MUST enforce current disclosure authority and MUST NOT return content merely because an older Event or audit record referenced it.
+
 Retrieval ranking or model output cannot change Record validity, classification, authority, or lifecycle. Unadmitted output is not institutional memory.
 
 ## 18. Audit-reference family
 
-`AuditReference` is a stable identifier and version for a protected or visible audit segment. A consequential trace references one Work Root, recording Command, initiating/participating/deciding/approving Actors, Role, Grant/delegation, Policy, evidence, Decision, Approval uses, Tool stages, Resources, causal references, outcomes, reconciliation, metrics, and Incident as applicable.
+`AuditReference` is a stable identifier with explicit `schema_version`, audit `entity_revision` or named content version, and integrity for a protected or visible audit segment. A consequential trace references one Work Root, recording Command, initiating and participating Actors, proposer/recommender, accountable decider, approvers, technical recorder, Role Assignment, Grant/delegation, Policy versions, Evidence, Decision, Approval uses, Tool stages, Resources, causal references, outcomes, reconciliation, metrics, and Incident as applicable.
+
+`DecisionGovernanceSnapshot` records Decision lifecycle state separately from `ExecutionEligibilityEvaluation`. The latter records bound evaluation time and current Actor/Role Assignment, Authority, Policy, Approval, Work Root, Resource, evidence-validity, risk/scope, lifecycle, suspension, Incident, and stop-condition results. `governance_conditions_satisfied` does not imply current eligibility. `executed` links an attempted Action and does not imply verified external success. Material changes after Decision or Approval require a fresh evaluation and may reject, pause, invalidate, or escalate.
+
+`DecisionOutcomeLink` preserves authorization, dispatch, attempt, observation, adapter interpretation, reconciliation, failure, partial, disputed, and verified states separately. It can represent an attempted Action with uncertain, failed, partial, or disputed outcome without changing the historical Decision disposition.
 
 Protected content uses `ProtectedAuditReference` with classification, authorized resolver, integrity, provenance, and safe description. `AuditCompletenessResult` lists required, present, withheld, missing, invalid, and unresolved links. Missing mandatory linkage blocks consequential completion; the protocol MUST NOT substitute human-readable narrative.
 
 ## 19. Bootstrap family
 
-`BootstrapRequest` is explicitly pre-Organization. It contains message identity/version, `organization_id=not_yet_known`, proposed stable Organization identity, verified initiating Human and proof, constitutional owner/governor Role, founding Role Assignment, founding Decision with constitutional duty reference, initial Grants, proposed founding Event semantics, audit references, expected empty/nonexistent stream condition, and idempotency key.
+`BootstrapRequest` is explicitly pre-Organization and declares `admission_basis=constitution_direct`, `genesis_exception=sole_preexisting_authority_exception`, and a reserved genesis Command type and Event types or equivalently explicit reserved classification. It contains message/family/schema versions; proposed stable Organization identity; verified initiating Human and proof; that Human as accountable decider for the founding Decision; constitutional owner/governor Role; founding Role Assignment; founding Decision with complete constitutional duty; initial Authority Grants; genesis recording Command; complete proposed founding Event set; Audit Record references; expected nonexistent/empty stream condition; Actor-scoped genesis idempotency identity; and deterministic competing-genesis conflict rule.
 
-`BootstrapCommitted` atomically returns the Organization, Human Actor, Role, assignment, Decision, Grants, consecutive founding Event positions, and audit identities. No component is visible operationally before the whole outcome commits. `BootstrapRejected` creates no operational Organization. `BootstrapUncertain` quarantines the proposed identity and forbids retry under a new identity until reconciliation. Exact retry returns the original outcome; conflicting reuse rejects. An Employee, model, Tool, or fictional Human body cannot be constitutional owner.
+`BootstrapCommitted` atomically returns the Organization, Human Actor, Role, Role Assignment, founding Decision, Grants, recording Command, consecutive founding Events/positions, Audit Record identities, original evaluation time, and `genesis_exception_exhausted=true`. No component is visible operationally before the whole outcome commits. `BootstrapPreviouslyAdmitted` is the exact-retry outcome and returns the original complete disposition, identifiers, positions, evaluation time, and integrity linkage without creating a second founding set.
+
+`BootstrapRejected` creates no operational Organization. `BootstrapUncertain` records an integrity state, quarantines the proposed identity, prohibits blind retry and competing identity establishment, requires reconciliation, and prevents any partial state from being used operationally. A materially different or competing genesis attempt rejects with a stable code or follows the declared deterministic constitutional rule without merging founding claims.
+
+Bootstrap structurally prohibits ordinary operational work, Employee or Temporary Worker creation, subscriptions, Tool invocations, ordinary Resource consumption, ambiguous/unreserved genesis types, AI accountable-decider attribution, and reuse of genesis authority after establishment. A model, Tool, Employee, or fictional Human body cannot occupy the verified founding Human or accountable-decider field.
 
 ## 20. Operational-control family
 
@@ -337,7 +384,7 @@ Protected content uses `ProtectedAuditReference` with classification, authorized
 - `CancellationRequest/Applied`: future work prevented, in-flight state, reservations, Approval use, external uncertainty, compensation/reconciliation, and audit;
 - `TimeoutObserved`: deadline, expected observation, bound time, source, uncertain state, and prohibited success/failure implication;
 - `RetryRequest/Disposition`: original operation identity, new attempt identity where applicable, nonexecution/idempotency/duplicate-risk evidence, current gates, limit, reservation, Decision/Approval, and reason;
-- `EscalationRequest/Disposition`: exact unresolved issue, safe default, evidence, eligible Actor/Role, Decision sought, deadline, and nonresponse semantics.
+- `EscalationRequest/Disposition`: exact unresolved issue, safe default, Evidence, eligible accountable-decider Actor or Governing Body, proposer/recommender, technical initiator/recorder, separately required approvers, Decision sought, deadline, and nonresponse semantics.
 
 Retries preserve original operation and correlation identities while receiving a distinct attempt identity. Conflicting operation reuse is rejected. Cancellation and timeout do not prove external nonexecution.
 
@@ -386,9 +433,9 @@ Reservation remains historical after release. Unknown consumption retains the sa
 
 ### 21.6 Schedule instance
 
-`defined → active → due_observed → materialization_proposed → materialized|missed|paused|rejected → dispatched|cancelled|catch_up_proposed`.
+`defined → active|suspended|cancelled → due_observed → trigger_deduplicated|trigger_conflicted|materialization_proposed → materialized|missed|paused|rejected|reconciling → dispatched|cancelled|catch_up_proposed`.
 
-Series suspension/cancellation prevents future materialization; it does not erase existing instances.
+Series suspension/cancellation prevents future materialization; it does not erase existing instances. Exact trigger redelivery preserves the original instance and disposition; conflict never silently produces a second execution.
 
 ### 21.7 Subscription delivery
 
@@ -410,7 +457,7 @@ Closure requires evidence and audit; unavailable or conflicted evidence cannot b
 
 ## 22. Stable reason-code registry
 
-Reason codes are immutable machine keys formatted `CATEGORY.SPECIFIC_CAUSE`. For every registry row, the component before the period is its explicit normative `category` field and the complete code is its stable identifier. Human-readable `safe_detail` is bounded, localizable, nonauthoritative, and MUST NOT be used for branching. Each failure record also contains `retryability` (`never`, `after_change`, `idempotent_only`, `after_reconciliation`), `reevaluation` (`no`, `allowed`, `required`), `escalation` (`none`, `conditional`, `required`), `incident` (`no`, `consider`, `required`), safe disclosure class, and conformance scenario references.
+The initial registry contains 65 immutable machine keys formatted `CATEGORY.SPECIFIC_CAUSE`. For every registry row, the component before the period is its explicit normative `category` field and the complete code is its stable identifier. Human-readable `safe_detail` is bounded, localizable, nonauthoritative, and MUST NOT be used for branching. Each failure record also contains `retryability` (`never`, `after_change`, `idempotent_only`, `after_reconciliation`), `reevaluation` (`no`, `allowed`, `required`), `escalation` (`none`, `conditional`, `required`), `incident` (`no`, `consider`, `required`), safe disclosure class, and conformance scenario references.
 
 | Code | Meaning | Retryability / reevaluation | Escalation / Incident | Safe disclosure | Conformance |
 |---|---|---|---|---|---|
@@ -433,8 +480,11 @@ Reason codes are immutable machine keys formatted `CATEGORY.SPECIFIC_CAUSE`. For
 | `WORK_ROOT.DUAL` | Goal and duty both supplied | after_change / required | none / no | Conflicting field names | WRT-004 |
 | `WORK_ROOT.INACTIVE` | Goal/duty not current for new work | after_change / required | conditional / no | State if authorized | WRT-005 |
 | `WORK_ROOT.INCOMPLETE` | Duty lacks mandatory component | after_change / required | none / no | Missing component names | WRT-006 |
+| `WORK_ROOT.INVALID_KIND` | Project, Objective, or another non-Goal/non-duty type claimed as Work Root | after_change / required | none / no | Invalid kind only | WRT-010 |
 | `DECISION.MISSING` | Consequential Decision absent | after_change / required | required / no | Decision class required | AUD-009 |
 | `DECISION.INCOMPLETE` | Mandatory Decision/audit fields absent | after_change / required | required / consider | Missing field categories | AUD-006, AUD-009 |
+| `DECISION.ACCOUNTABLE_DECIDER_INVALID` | Human-reserved disposition lacks eligible Human/body accountable decider | after_change / required | required / consider | Required decider class, no protected member data | AUT-015, BST-011 |
+| `DECISION.CURRENT_CONDITIONS_INVALID` | Historical Decision state no longer satisfies current execution conditions | after_change / required | conditional / consider | Changed condition categories | AUD-013, AUD-015 |
 | `APPROVAL.MISSING` | Policy requires Approval and none applies | after_change / required | required / no | Approval class required | APR-008 |
 | `APPROVAL.EXPIRED` | Approval expired | after_change / required | conditional / no | Approval reference if authorized | APR-005 |
 | `APPROVAL.REVOKED` | Approval revoked | after_change / required | conditional / consider | Revocation reference if authorized | APR-006 |
@@ -448,6 +498,8 @@ Reason codes are immutable machine keys formatted `CATEGORY.SPECIFIC_CAUSE`. For
 | `STATE.STALE_VERSION` | Expected entity/projection version stale | after_change / required | none / no | Expected/current versions if authorized | CMD-007, ADV-003 |
 | `IDEMPOTENCY.CONFLICT` | Key/identity reused for different operation | never / no | required / consider | Key reference, no other operation detail | CMD-012 |
 | `STREAM.CONCURRENCY_CONFLICT` | Expected prior stream position differs | after_change / required | none / no | Expected/current position | EVT-003 |
+| `EVENT.FIELD_APPLICABILITY_INVALID` | Required/optional/not-applicable semantics are missing, unresolved, or simulated by placeholder | after_change / required | conditional / consider | Field path and applicability class only | EVT-010 |
+| `EVENT.PROHIBITED_FIELD` | Field prohibited by selected Event schema is present, even empty | after_change / required | conditional / consider | Field path only | EVT-010 |
 | `APPEND.FAILED` | Append confirmed not committed due failure | idempotent_only / required | conditional / consider | Failure class | ADV-001 |
 | `APPEND.OUTCOME_UNCERTAIN` | Commit/noncommit cannot be established | after_reconciliation / required | required / required | Proposal ID and uncertainty | ADV-002 |
 | `SUBSCRIPTION.UNAUTHORIZED` | Subscriber lacks scope/purpose/Grant | after_change / required | conditional / consider | No protected Event metadata | SUB-002 |
@@ -459,13 +511,21 @@ Reason codes are immutable machine keys formatted `CATEGORY.SPECIFIC_CAUSE`. For
 | `TOOL.EVIDENCE_CONTRADICTORY` | Material Tool observations conflict | after_reconciliation / required | required / consider | Evidence refs/classification | TOL-007, ADV-007 |
 | `RECONCILIATION.REQUIRED` | Safe state requires reconciliation | after_reconciliation / required | conditional / consider | Subject and deadline | TOL-004, RES-009 |
 | `AUDIT.LINKAGE_MISSING` | Mandatory consequential trace absent | after_change / required | required / consider | Missing link categories | AUD-009, ADV-022 |
-| `BOOTSTRAP.INCOMPLETE` | Founding atomic set invalid or partial | after_change / required | required / required | Missing categories, no protected content | BST-002, BST-004 |
+| `BOOTSTRAP.INCOMPLETE` | Proposed founding set is incomplete before authoritative commit | after_change / required | required / consider | Missing categories, no protected content | BST-004 |
+| `BOOTSTRAP.GENESIS_TYPE_INVALID` | Command/Event type or classification is not reserved unambiguous genesis | after_change / required | required / consider | Required genesis class | BST-012 |
+| `BOOTSTRAP.GENESIS_SCOPE_INVALID` | Genesis includes ordinary work/effects or reuses exhausted exception | never / no | required / required | Prohibited scope category | BST-005, BST-010 |
+| `BOOTSTRAP.IDENTITY_QUARANTINED` | Proposed identity has uncertain or partial authoritative genesis state | after_reconciliation / required | required / required | Quarantine identity only | BST-002 |
+| `BOOTSTRAP.COMPETING_GENESIS` | Materially different founding attempt conflicts with registered genesis | never / no | required / required | Conflict class, no other founding data | BST-007 |
 | `INCIDENT.SUSPENDED` | Incident control blocks operation | after_change / required | required / already linked | Incident ref if authorized | OPS-001, SCH-006 |
 | `OPERATION.TIMEOUT` | Required observation absent by deadline | after_reconciliation / required | conditional / consider | Deadline and subject | OPS-005 |
 | `OPERATION.CANCELLED` | Future operation cancelled | never / no | none / no | Cancellation reference | OPS-003, SCH-010 |
 | `RETRY.PROHIBITED` | Retry lacks proof/idempotency/approved risk | after_change / required | required / consider | Required evidence class | OPS-007, OPS-008 |
 | `GOVERNANCE.DEPENDENCY_UNAVAILABLE` | Identity/authority/classification/audit dependency unavailable | after_change / required | required / consider | Dependency class only | ADV-010, ADV-011, ADV-021, ADV-022 |
 | `INTEGRITY.VERIFICATION_FAILED` | Integrity proof/checkpoint/history invalid | after_change / required | required / required | Position/reference, no protected data | ADV-008, RPL-008, RPL-009 |
+| `RELATIONSHIP.INTEGRITY_CONFLICT` | Derived inverse relationship conflicts with canonical entity/Event state | after_change / required | required / required | Relationship kind and protected canonical ref | REL-001–REL-006 |
+| `CONTENT.GOVERNED_UNAVAILABLE` | Current governed availability forbids or cannot provide referenced content | after_change / required | conditional / consider | Tombstone/classification state, never content | RPL-013, RPL-015 |
+| `CONTENT.CRYPTOGRAPHICALLY_ERASED` | Referenced content was cryptographically erased and is nonreconstructive | never / no | conditional / consider | Erasure/tombstone reference, never content | RPL-014 |
+| `SCHEDULE.TRIGGER_CONFLICT` | Trigger conflicts with registered instance or materialization identity | after_reconciliation / required | conditional / consider | Series/instance reference if authorized | SCH-015 |
 
 Codes are never repurposed. New codes are additive within a compatible version only when old consumers can safely treat the category as failure. Human text changes do not change machine semantics.
 
@@ -479,7 +539,7 @@ The receiver MUST enforce:
 4. Actor, Approval, Authority, Tool-result, and adapter references require integrity-bound resolution, not identifier existence alone;
 5. subscription filters are versioned, bounded predicates applied after Organization/purpose/classification authorization and cannot request hidden fields;
 6. replay mode and live mode are disjoint types at the adapter boundary; live adapters reject replay traffic even if misrouted;
-7. idempotency keys are scoped by Organization and operation family; equality must not reveal whether the same key exists elsewhere;
+7. mutating idempotency keys are scoped by Organization, initiating Actor, and operation family and bind the original operation identity and material semantics; equality must not reveal another Actor's or Organization's registration;
 8. input size, nesting, collection count, reference count, and expansion are bounded before authoritative parsing or effect;
 9. type names are stable registry values, not caller-defined aliases; ambiguous or downgraded schemas reject;
 10. human-readable failure detail is bounded, classified, and never includes protected target existence, secrets, raw payloads, or cross-Organization state;
@@ -488,23 +548,23 @@ The receiver MUST enforce:
 
 ## 24. Conformance traceability
 
-This matrix maps protocol families to mandatory suites in `KERNEL_CONFORMANCE.md`; it does not duplicate the 206 scenario definitions.
+This matrix maps all 20 protocol families to the final 228 mandatory scenarios across 18 suites in `KERNEL_CONFORMANCE.md`; it does not duplicate their definitions. PF-05 and PF-16 implement the canonical relationship records and PF-03 supplies their accepted Event history, together covering REL.
 
 | Families | Primary conformance suites |
 |---|---|
-| PF-01 Command, PF-02 disposition | CMD, AUT, WRT, APR, RES, ADV |
-| PF-03 Event, PF-04 append | EVT, CMD, APR, RES, RPL, ADV |
-| PF-05 Projection | EVT, RPL, POR, MEM, ADV |
-| PF-06 Replay | RPL, POR, ADV |
+| PF-01 Command, PF-02 disposition | CMD, AUT, WRT, APR, RES, AUD, BST, ADV |
+| PF-03 Event, PF-04 append | EVT, CMD, APR, RES, REL, RPL, ADV |
+| PF-05 Projection | EVT, REL, RPL, POR, MEM, ADV |
+| PF-06 Replay | RPL, REL, MEM, POR, ADV |
 | PF-07 Subscription | SUB, RPL, ADV |
-| PF-08 Scheduling | SCH, OPS, APR, RES, ADV |
+| PF-08 Scheduling | SCH, OPS, AUT, WRT, APR, RES, LIF, AUD, ADV |
 | PF-09 Tool dispatch, PF-10 attempt, PF-11 result | TOL, OPS, AUD, RES, ADV |
 | PF-12 Reconciliation | TOL, RES, OPS, AUD, ADV |
 | PF-13 Resource | RES, APR, TOL, SCH, ADV |
 | PF-14 Approval use | APR, CMD, SCH, TOL, ADV |
 | PF-15 Memory | MEM, AUD, RPL, ADV |
-| PF-16 Audit | AUD, CMD, TOL, MEM, ADV |
-| PF-17 Bootstrap | BST, EVT, AUD, ADV |
+| PF-16 Audit | AUD, REL, CMD, TOL, MEM, RPL, ADV |
+| PF-17 Bootstrap | BST, AUT, EVT, AUD, ADV |
 | PF-18 Operational control | OPS, LIF, SCH, TOL, ADV |
 | PF-19 Version negotiation | CMD, EVT, RPL, POR, ADV |
 | PF-20 Failure | Every negative suite scenario and ADV |
@@ -515,9 +575,9 @@ These examples show logical fields and relationships. Braces and arrows are expl
 
 ### 25.1 Accepted Command
 
-`CommandSubmission { message_id=msg:cmd:41, command_id=cmd:alpha:41, original_operation_id=op:alpha:41, org=org-alpha, actor=employee-operator, work_root=goal:launch, operation=artifact.review, expected_version=7, grant=grant:a2:active, approval=not_applicable, resources={compute:2}, idempotency=alpha/review/41 }`
+`CommandSubmission { message_id=msg:cmd:41, command_id=cmd:alpha:41, original_operation_id=op:alpha:41, organization_id=org-alpha, initiating_actor_id=employee-operator, work_root=Goal(goal:launch), planning_references=absent_optional, operation_family=artifact, operation_type=artifact.review, expected_entity_revision=7, grant=grant:a2:active, approval_references=absent_optional, resources={compute:2}, idempotency_key=review/41 }`
 
-`AdmissionAccepted[msg:disp:41] { command=cmd:alpha:41, evaluation_time=T100, events=[evt:reserve:41@P88, evt:task-started:41@P89], next_step=employee_work, verified_outcome=not_yet_known }`
+`AdmissionAccepted[msg:disp:41] { command=cmd:alpha:41, evaluation_time=T100, events=[evt:reserve:41@P88, evt:task-started:41@P89], next_step=employee_work }` (a verified external outcome field is prohibited on acceptance).
 
 ### 25.2 Rejected Command
 
@@ -525,7 +585,9 @@ These examples show logical fields and relationships. Braces and arrows are expl
 
 ### 25.3 Exact duplicate Command
 
-`CommandSubmission { message_id=msg:cmd:41, command_id=cmd:alpha:41, same idempotency and semantics } → AdmissionPreviouslyAdmitted { original=msg:disp:41, evaluation_time=T100, new_events=none, new_reservations=none, dispatches=none }`
+`CommandSubmission { organization_id=org-alpha, initiating_actor_id=employee-operator, operation_family=artifact, idempotency_key=review/41, command_id=cmd:alpha:41, same material semantics } → AdmissionPreviouslyAdmitted { original=msg:disp:41, evaluation_time=T100, event_ids=[evt:reserve:41,evt:task-started:41], positions=[P88,P89], resource_effects=original, approval_use=original, dispatch_identity=none }`
+
+The same textual key used by `employee-router` has a distinct Actor scope and reveals nothing about `employee-operator`; reuse by `employee-operator` with different material semantics returns `IDEMPOTENCY.CONFLICT` while preserving the original registration.
 
 ### 25.4 Atomic append batch
 
@@ -545,7 +607,7 @@ These examples show logical fields and relationships. Braces and arrows are expl
 
 ### 25.8 Scheduled instance materialization
 
-`ScheduleDueObserved[due:series9:instance4] → ScheduleInstanceMaterialization { series=series9, instance=instance4, command=cmd:schedule:instance4, actor=service-scheduler, work_root=duty:maintenance, gates=current }`
+`ScheduleDueObserved[due:series9:instance4] → ScheduleInstanceMaterialization { series=series9, instance=instance4, command=cmd:schedule:instance4, initiating_actor_id=service-scheduler, technical_role=scheduler_only, accountable_decider=human-ops-owner, work_root=Duty(maintenance), revalidated=[actor,role_assignment,authority,policy,work_root,approval,resources,lifecycle,suspension,incident,stop_conditions] }`
 
 ### 25.9 Classified subscription delivery
 
@@ -553,7 +615,7 @@ These examples show logical fields and relationships. Braces and arrows are expl
 
 ### 25.10 Replay report proving zero effects
 
-`ReplayReport[replay:3] { mode=replay, range=P0..P120, projection=equivalent, external_references=reconstructed, tool_calls=0, communications=0, charges=0, approval_mutations=0, new_events=0 }`
+`ReplayReport[replay:3] { mode=replay, range=P0..P120, projection=equivalent, external_references=reconstructed_only, governed_availability=reconstructed, tool_calls=0, communications=0, charges=0, approval_mutations=0, new_events=0 }`
 
 ### 25.11 Uncertain append requiring reconciliation
 
@@ -561,7 +623,49 @@ These examples show logical fields and relationships. Braces and arrows are expl
 
 ### 25.12 Atomic bootstrap
 
-`BootstrapRequest[bootstrap:alpha] { proposed_org=org-alpha, verified_human=human-owner-alpha, role=constitutional-owner, assignment=founding, decision=decision:founding, grants=[grant:founding], events=[organization-created,...], idempotency=bootstrap/alpha } → BootstrapCommitted { all_entities_and_events_atomic=true, operational=true }`
+`BootstrapRequest[bootstrap:alpha] { admission_basis=constitution_direct, genesis_type=reserved, proposed_org=org-alpha, verified_human=human-owner-alpha, accountable_decider=human-owner-alpha, role=constitutional-owner, assignment=founding, decision=decision:founding, duty=constitution:establish, grants=[grant:founding], recording_command=cmd:genesis:alpha, events=[genesis.organization_created,...], audit=audit:genesis:alpha, expected_stream=nonexistent, idempotency=bootstrap/alpha } → BootstrapCommitted { all_entities_and_events_atomic=true, genesis_exception_exhausted=true, operational=true }`
+
+### 25.13 Event applicability controls
+
+- Valid mechanical: `EventRecord[type=RoleAssignmentActivated] { common_envelope=complete, epistemic_status=not_applicable(schema_permitted) }`; confidence, Evidence, and result are absent because this schema prohibits them.
+- Valid consequential: `EventRecord[type=ActionOutcomeObserved] { common_envelope=complete, resources=[resource:compute], evidence=[evidence:receipt], result=partial, epistemic_status=observed, confidence=known(organization_scale:0.8) }`.
+- Missing required: `ActionOutcomeObserved { evidence=absent } → EVENT.FIELD_APPLICABILITY_INVALID`.
+- Prohibited present: `RoleAssignmentActivated { confidence=known(1.0) } → EVENT.PROHIBITED_FIELD`.
+- Ceremonial placeholder: `ActionOutcomeObserved { evidence=[], result="generic", confidence=1.0 } → EVENT.FIELD_APPLICABILITY_INVALID`.
+
+### 25.14 Human accountable decider
+
+Accepted: `GovernanceRoleAttribution { proposer=employee-analyst, recommender=employee-analyst, accountable_decider=human-governor, approver=human-reviewer, technical_recorder=employee-router }` with independently valid Decision and Approval.
+
+Rejected: `GovernanceRoleAttribution { accountable_decider=employee-analyst, approver=human-governor, decision_class=A4 } → DECISION.ACCOUNTABLE_DECIDER_INVALID`; the Approval does not cure the Decision.
+
+### 25.15 Bootstrap retry, conflict, and quarantine
+
+`exact BootstrapRequest[bootstrap:alpha] → BootstrapPreviouslyAdmitted { original_disposition, identifiers, positions, evaluation_time }`; `different founding Human or data → BOOTSTRAP.COMPETING_GENESIS`; `accountable_decider=employee-founder → DECISION.ACCOUNTABLE_DECIDER_INVALID`; `unreserved type → BOOTSTRAP.GENESIS_TYPE_INVALID`; `uncertain partial append → BootstrapUncertain { proposed_org=quarantined, retry=after_reconciliation }`.
+
+### 25.16 Canonical relationship authority
+
+`CanonicalRelationshipSnapshot { kind=role_occupancy, source=RoleAssignment:ra7@entity_revision3 } + InverseProjectionResponse { actor_roles=[role-operator,role-forged] } → RelationshipConflict { reason=RELATIONSHIP.INTEGRITY_CONFLICT, eligibility=fail_closed }`.
+
+### 25.17 Direct Work Roots and optional planning
+
+Valid: `TaskSubmission { work_root=Goal(goal:launch), project/objective/plan=absent_optional }` and `TaskSubmission { work_root=Duty(type=maintenance, mandate=policy:ops, owner=human-ops, scope=backup, completion=verified), project/objective/plan=absent_optional }`. Invalid: `TaskSubmission { work_root=Project(project:launch) } → WORK_ROOT.INVALID_KIND`.
+
+### 25.18 Duplicate schedule trigger
+
+`ScheduleDueObserved[due:9] → materialization[instance:9]`; exact redelivery returns the original instance and Command, while a conflicting trigger binding returns `SCHEDULE.TRIGGER_CONFLICT` and pauses or reconciles without dispatch.
+
+### 25.19 Replay after cryptographic erasure
+
+`Event[P40 references protected:artifact7] → CryptographicErasure[P90, tombstone=tomb:artifact7] → ReplayReport { reference=protected:artifact7, availability=erased, availability_reason=CONTENT.CRYPTOGRAPHICALLY_ERASED, tombstone=tomb:artifact7, content=prohibited_absent, current_disclosure=false, external_system_reconstructed=false }`.
+
+### 25.20 Decision-state revalidation
+
+`DecisionGovernanceSnapshot { state=governance_conditions_satisfied, authority_at_decision=grant:a3 } + ExecutionEligibilityEvaluation { current_authority=expired } → DECISION.CURRENT_CONDITIONS_INVALID`; `Decision { state=executed } + ActionOutcome { state=disputed }` remains attempted and disputed, never verified success.
+
+### 25.21 Collective Governing Body
+
+`GoverningBodyDisposition { body=board:alpha, membership_snapshot=members@P120, human_dispositions=[vote:h1:consent,vote:h2:dissent,vote:h3:recusal], eligibility_bases=[...], quorum_rule=quorum:v3, voting_policy=policy:board:v8, derived_result=accepted, technical_initiator=service-recorder }`; no fictional Human represents the body.
 
 ## 26. Protocol conformance requirements
 
@@ -571,7 +675,7 @@ A conforming implementation MUST demonstrate through `KERNEL_CONFORMANCE.md` tha
 - caller-controlled data cannot populate or override kernel-bound facts;
 - all authoritative mutations have one recording Command and immutable Event linkage;
 - live, replay, observation, and platform-security modes are structurally separated;
-- exact duplicates preserve identity and conflicting reuse fails closed within Organization scope;
+- exact duplicates preserve the original disposition, identifiers, positions, evaluation time, Resource/Approval effects, and dispatch identity; conflicting reuse fails closed within the Organization/initiating-Actor/operation-family scope;
 - append, Resource reservation, Approval use, audit linkage, and dispatch intent are atomic where required;
 - Tool knowledge and append certainty preserve unknown/uncertain states;
 - reason codes, not human text, drive machine behavior; and

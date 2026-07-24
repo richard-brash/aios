@@ -63,18 +63,37 @@ a confirmed precommit failure.
 ### Idempotency and optimistic concurrency
 
 Idempotency is scoped by Organization, initiating Actor, operation family, and
-key, and compares a deterministic semantic Command fingerprint. An exact
-duplicate returns `PreviouslyAdmitted` with the original disposition identity,
-time, Event IDs, and result and allocates nothing. Conflicting reuse records an
-`IDEMPOTENCY.CONFLICT` rejection. An uncertain prior outcome blocks retry until
-reconciliation. Atomic append checks the expected prior Organization position.
+key. `semantic_command_identity` defines equivalence as an immutable logical
+value containing every caller-supplied CreateTask field except the envelope
+`message_id`, which identifies delivery rather than the requested operation.
+Typed identifiers and presence values retain their types; mappings are ordered
+by canonical logical key; normatively ordered sequences retain their order. A
+nonnormative length-prefixed internal encoding is hashed with SHA-256. This
+encoding is an implementation detail, not a wire format or cross-language
+serialization contract.
+
+An exact duplicate returns `PreviouslyAdmitted` with the original disposition
+identity, time, Event IDs, and result and allocates nothing. Conflicting reuse
+returns `IDEMPOTENCY.CONFLICT` without replacing the original registration. An
+uncertain prior outcome blocks retry until reconciliation. Preflight inspection
+is advisory. The store checks the registration under its atomic lock before
+stream concurrency validation and mutation, then registers the fingerprint in
+the same commit as Events, audit, projection, Resources, and Approval use.
+Existing authoritative registrations are never overwritten.
+
+Uncertain results separately report whether authoritative organizational state
+may have changed, whether internal reconciliation-safety metadata was recorded,
+and whether external domain mutation may have occurred. The reference slice has
+no external effects, so the last value is always false. For uncertainty before
+commit, an internal retry-blocking registration may exist even though no
+authoritative Event or Task state changed.
 
 ### Organization isolation
 
 The bound snapshot resolves the Organization of the Actor, Goal, Decision,
 Grants, Approvals, and Resources. Any mismatch rejects with bounded detail that
-does not disclose the foreign Organization. Idempotency keys are Organization
-scoped.
+does not disclose the foreign Organization. Idempotency keys are scoped by
+Organization and Actor as well as operation family and key.
 
 ### Gate order and failure closure
 

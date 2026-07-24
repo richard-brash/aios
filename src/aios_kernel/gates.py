@@ -12,7 +12,23 @@ class GateName(str, Enum):
     WORK_ROOT="work_root"; DECISION="decision"; APPROVAL="approval"; TARGET="target"
     INCIDENT="incident"; LIFECYCLE="lifecycle"; RESOURCE="resource"; FINAL_INVARIANT="final_invariant"
 
-GATE_ORDER = tuple(GateName)
+GATE_ORDER = (
+    GateName.STRUCTURE,
+    GateName.SUPPORTED_OPERATION,
+    GateName.ORGANIZATION,
+    GateName.IDENTITY,
+    GateName.IDEMPOTENCY,
+    GateName.AUTHORITY,
+    GateName.POLICY,
+    GateName.WORK_ROOT,
+    GateName.DECISION,
+    GateName.APPROVAL,
+    GateName.TARGET,
+    GateName.INCIDENT,
+    GateName.LIFECYCLE,
+    GateName.RESOURCE,
+    GateName.FINAL_INVARIANT,
+)
 
 class GateStatus(str, Enum):
     PASS="pass"; DENY="deny"; UNAVAILABLE="unavailable"; INDETERMINATE="indeterminate"

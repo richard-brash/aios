@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from aios_kernel.admission import CreateTaskAdmission
 from aios_kernel.create_task import CreateTaskCommand, InitialTaskState
-from aios_kernel.gates import GateName
+from aios_kernel.gates import GATE_ORDER, GateName
 from aios_kernel.projections import compare_projection, rebuild_task_projection
 from aios_kernel.ports import GovernancePorts
 from aios_kernel.reference import BoundSnapshotReader, DeterministicIdentifiers, Fault, FixedClock, InMemoryStore, allow, deny, indeterminate, unavailable
@@ -86,7 +86,7 @@ class CreateTaskBehavior(unittest.TestCase):
             for token in ("datetime.now(","datetime.utcnow(","time.time(","random.","uuid.","os.environ","getenv(","socket."): self.assertNotIn(token,source)
             return
         if n==12:
-            result=app.admit(cmd); audit=next(iter(store.audits.values())); self.assertEqual([x.gate for x in audit.evaluation_facts],list(GateName)); return
+            result=app.admit(cmd); audit=next(iter(store.audits.values())); self.assertEqual(tuple(x.gate for x in audit.evaluation_facts),GATE_ORDER); return
         if n in {13,14,15,16,28,29,30,31,32,33,34,36,37,38,39,40,41,46}:
             mapping={13:(GateName.IDENTITY,deny(GateName.IDENTITY,ReasonCode.IDENTITY_UNKNOWN)),14:(GateName.POLICY,unavailable(GateName.POLICY,ReasonCode.POLICY_UNAVAILABLE)),
              15:(GateName.AUTHORITY,indeterminate(GateName.AUTHORITY)),16:(GateName.POLICY,deny(GateName.POLICY,ReasonCode.POLICY_DENIED)),
@@ -152,7 +152,7 @@ class CreateTaskBehavior(unittest.TestCase):
             app,store,ids,cmd=engine(); app.admit(cmd)
             changed=dataclasses.replace(cmd,title="Different")
             second,_,_,_=engine(cmd=changed,snap=dataclasses.replace(snapshot(),stream_position=5),store=store)
-            result=second.admit(changed); self.assertEqual(result.disposition.reason_code,ReasonCode.IDEMPOTENCY_CONFLICT)
+            result=second.admit(changed); self.assertEqual(result.status,TransactionStatus.IDEMPOTENCY_CONFLICT); self.assertEqual(result.reason_code,ReasonCode.IDEMPOTENCY_CONFLICT)
             third,_,_,_=engine(cmd=cmd,snap=dataclasses.replace(snapshot(),stream_position=6),store=store)
             self.assertIsInstance(third.admit(cmd).disposition,PreviouslyAdmitted)
             self.assertEqual(len(store.task_projection(cmd.submission.envelope.organization_id)),1); return

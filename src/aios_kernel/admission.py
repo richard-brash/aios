@@ -2,13 +2,11 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
-import hashlib
 
 from aios_protocol.commands import DutyWorkRoot, GoalWorkRoot
 from aios_protocol.dispositions import Accepted, PreviouslyAdmitted, Rejected
 from aios_protocol.envelope import KernelDispositionEnvelope
-from aios_protocol.identifiers import AuditRecordId, EventId, IntegrityReference, MessageId, StreamId
+from aios_protocol.identifiers import IntegrityReference, StreamId
 from aios_protocol.reason_codes import ReasonCode
 from aios_protocol.validation import FrozenMap
 
@@ -18,23 +16,13 @@ from .errors import KernelInternalError
 from .events import create_authoritative_event
 from .gates import GATE_ORDER, GateName, GateResult, GateStatus
 from .ids import IdentifierAllocator
+from .idempotency import (
+    IdempotencyRegistration, IdempotencyScope, IdempotencyState,
+    semantic_command_fingerprint,
+)
 from .ports import AtomicAppendStore, GovernancePorts, SnapshotReader
 from .snapshots import EvaluationSnapshot, SnapshotUnavailable
-from .transaction import AuditRecord, IdempotencyRegistration, KernelTransaction, TransactionResult, TransactionStatus
-
-@dataclass(frozen=True, slots=True)
-class IdempotencyScope:
-    organization_id: str; initiating_actor_id: str; operation_family: str; idempotency_key: str
-
-class IdempotencyState(str, Enum):
-    NEW="new"; EXACT="exact"; CONFLICT="conflict"; UNCERTAIN="uncertain"
-
-@dataclass(frozen=True, slots=True)
-class IdempotencyInspection:
-    state: IdempotencyState
-    original_disposition: object | None = None
-    original_fingerprint: str | None = None
-    reconciliation_reference: IntegrityReference | None = None
+from .transaction import AuditRecord, KernelTransaction, TransactionResult, TransactionStatus
 
 @dataclass(frozen=True, slots=True)
 class GateInput:
@@ -58,9 +46,6 @@ def _pass(gate: GateName, facts: FrozenMap = FrozenMap()) -> GateResult:
 def _fail(gate: GateName, reason: ReasonCode, detail: str, status: GateStatus = GateStatus.DENY) -> GateResult:
     return GateResult(gate, status, reason, FrozenMap(), (), detail, "submit a new Command after correction", FrozenMap({"failed_gate": gate.value}))
 
-def _fingerprint(command: CreateTaskCommand) -> str:
-    return hashlib.sha256(repr(command).encode("utf-8")).hexdigest()
-
 class CreateTaskAdmission:
     """Supports exactly CreateTask; evaluators are evidence-bearing and fail closed."""
     def __init__(self, *, clock: Clock, identifiers: IdentifierAllocator, snapshots: SnapshotReader,
@@ -79,26 +64,33 @@ class CreateTaskAdmission:
                                      ReasonCode.GOVERNANCE_DEPENDENCY_UNAVAILABLE)
         snapshot = snapshot_result
         results: list[GateResult] = []
-        fingerprint = _fingerprint(command)
-        scope = IdempotencyScope(str(snapshot.organization_id), str(command.submission.envelope.initiating_actor_id),
+        fingerprint = semantic_command_fingerprint(command)
+        scope = IdempotencyScope(snapshot.organization_id, command.submission.envelope.initiating_actor_id,
                                  command.submission.operation_type, command.submission.idempotency_key)
         for gate in GATE_ORDER:
             result = self._evaluate_gate(gate, command, snapshot, evaluation_time, tuple(results), scope, fingerprint)
             if gate is GateName.IDEMPOTENCY and result is None:
-                inspection = self._store.inspect_idempotency(scope, fingerprint)
+                # Preflight is advisory; the locked check is authoritative and append
+                # repeats it before mutation to close the NEW-to-append race.
+                self._store.inspect_idempotency(scope, fingerprint)
+                inspection = self._store.enforce_idempotency(scope, fingerprint)
                 if inspection.state is IdempotencyState.EXACT:
                     original = inspection.original_disposition
                     if not isinstance(original, (Accepted, Rejected)):
                         raise KernelInternalError("KERNEL.IDEMPOTENCY_INVALID", "original disposition is unavailable")
                     duplicate = PreviouslyAdmitted(original.envelope, original.envelope.message_id,
                         original.event_ids if isinstance(original, Accepted) else ())
-                    return TransactionResult(TransactionStatus.CONFIRMED, duplicate, None)
+                    return TransactionResult(TransactionStatus.PREVIOUSLY_ADMITTED, duplicate, None)
                 if inspection.state is IdempotencyState.UNCERTAIN:
                     return TransactionResult(TransactionStatus.OUTCOME_UNCERTAIN, None,
-                        ReasonCode.RECONCILIATION_REQUIRED, mutation_may_have_occurred=True,
+                        ReasonCode.RECONCILIATION_REQUIRED,
+                        authoritative_mutation_may_have_occurred=inspection.authoritative_mutation_may_have_occurred,
+                        internal_reconciliation_metadata_recorded=inspection.internal_reconciliation_metadata_recorded,
                         reconciliation_reference=inspection.reconciliation_reference)
-                result = (_fail(gate, ReasonCode.IDEMPOTENCY_CONFLICT, "idempotency identity conflicts")
-                          if inspection.state is IdempotencyState.CONFLICT else _pass(gate))
+                if inspection.state is IdempotencyState.CONFLICT:
+                    return TransactionResult(TransactionStatus.IDEMPOTENCY_CONFLICT, None,
+                                             ReasonCode.IDEMPOTENCY_CONFLICT)
+                result = _pass(gate)
             assert result is not None
             results.append(result)
             if not result.passed:
@@ -193,8 +185,7 @@ class CreateTaskAdmission:
             command.submission.envelope.correlation_id,context.evaluation_time,command.submission.envelope.classification,audit_id)
         accepted=Accepted(denv,event_ids,"Task recorded in proposed state",FrozenMap({"task_version":1}))
         audit=AuditRecord(audit_id,context.snapshot.organization_id,command.submission.command_id,context.gate_results,"accepted",IntegrityReference(f"integrity:{audit_id}"))
-        reg=IdempotencyRegistration(context.snapshot.organization_id,str(command.submission.envelope.initiating_actor_id),
-            command.submission.operation_type,command.submission.idempotency_key,fingerprint,disposition_id)
+        reg=IdempotencyRegistration(scope,fingerprint,disposition_id)
         projection=FrozenMap({"task_id":command.proposed_task_id})
         return self._store.append(KernelTransaction(context.snapshot.organization_id,StreamId(f"organization:{context.snapshot.organization_id}"),
             command.expected_stream_position,tuple(events),accepted,audit,reg,projection,tuple(reservation),tuple(approval)))
@@ -210,7 +201,6 @@ class CreateTaskAdmission:
         rejected=Rejected(denv,failure.reason_code,failure.gate.value,failure.safe_explanation)
         audit=AuditRecord(audit_id,snapshot.organization_id,command.submission.command_id,results,"rejected",IntegrityReference(f"integrity:{audit_id}"))
         reg=(None if failure.reason_code is ReasonCode.IDEMPOTENCY_CONFLICT else
-             IdempotencyRegistration(snapshot.organization_id,scope.initiating_actor_id,scope.operation_family,
-                                     scope.idempotency_key,fingerprint,disposition_id))
+             IdempotencyRegistration(scope,fingerprint,disposition_id))
         return self._store.append(KernelTransaction(snapshot.organization_id,StreamId(f"organization:{snapshot.organization_id}"),
             snapshot.stream_position,(event,),rejected,audit,reg,None))

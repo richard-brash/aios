@@ -48,8 +48,10 @@ class GovernancePorts:
 
 class AtomicAppendStore(Protocol):
     def inspect_idempotency(self, key: "IdempotencyScope", fingerprint: str) -> "IdempotencyInspection": ...
+    def enforce_idempotency(self, key: "IdempotencyScope", fingerprint: str) -> "IdempotencyInspection": ...
     def append(self, transaction: KernelTransaction) -> TransactionResult: ...
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from .admission import GateInput, IdempotencyInspection, IdempotencyScope
+    from .admission import GateInput
+    from .idempotency import IdempotencyInspection, IdempotencyScope

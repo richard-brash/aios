@@ -1,0 +1,28 @@
+"""Runtime coverage mapping for authenticated admission scenarios."""
+
+ADB_RUNTIME_MAP = {
+    "ADB-001": "test_adb_001_malformed_is_nonrecording",
+    "ADB-002": "test_adb_002_unsupported_support_is_effect_free",
+    "ADB-003": "test_adb_003_unknown_organization_is_nonrecording",
+    "ADB-004": "test_adb_004_identifier_syntax_does_not_create_boundary",
+    "ADB-005": "test_adb_005_unknown_or_forged_actor_is_nonrecording",
+    "ADB-006": "test_adb_006_cross_organization_actor_is_nonrecording",
+    "ADB-007": "test_adb_007_denial_reads_no_stream",
+    "ADB-008": "test_adb_008_denial_appends_no_event_or_audit",
+    "ADB-009": "test_adb_009_denial_allocates_no_authoritative_ids",
+    "ADB-010": "test_adb_010_denial_invokes_no_governance",
+    "ADB-011": "test_adb_011_denial_invokes_no_handler",
+    "ADB-012": "test_adb_012_denial_uses_no_idempotency",
+    "ADB-013": "test_adb_013_repeated_denial_remains_nonrecording",
+    "ADB-014": "test_adb_014_exact_canonical_organization_is_bound",
+    "ADB-015": "test_adb_015_exact_canonical_actor_and_proof_are_bound",
+    "ADB-016": "test_adb_016_admission_does_not_grant_authority",
+    "ADB-017": "test_adb_017_governance_denial_is_attributably_recorded",
+    "ADB-018": "test_adb_018_handler_denial_is_attributably_recorded",
+    "ADB-019": "test_adb_019_recorded_rejection_redelivery_is_exact",
+    "ADB-020": "test_adb_020_hostile_claim_creates_no_stream",
+    "ADB-021": "test_adb_021_unrelated_history_is_unchanged",
+    "ADB-022": "test_adb_022_bootstrap_cannot_enter_ordinary_runtime",
+    "ADB-023": "test_adb_023_ordinary_command_cannot_claim_bootstrap_traffic",
+    "ADB-024": "test_adb_024_replay_does_not_resolve_admission",
+}

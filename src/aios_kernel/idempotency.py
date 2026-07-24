@@ -9,7 +9,6 @@ import math
 from collections.abc import Mapping
 
 from aios_protocol.identifiers import ActorId, Identifier, IntegrityReference, MessageId, OrganizationId
-from aios_protocol.dispositions import AdmissionDisposition
 
 from .create_task import CreateTaskCommand
 
@@ -35,7 +34,7 @@ class IdempotencyState(str, Enum):
 @dataclass(frozen=True, slots=True)
 class IdempotencyInspection:
     state: IdempotencyState
-    original_disposition: AdmissionDisposition | None = None
+    original_disposition: object | None = None
     original_fingerprint: str | None = None
     reconciliation_reference: IntegrityReference | None = None
     authoritative_mutation_may_have_occurred: bool = False
@@ -149,6 +148,16 @@ def _encode(value: object) -> bytes:
             str(len(item)).encode("ascii") + b":" + item for item in encoded
         )
     raise TypeError("semantic logical value contains an unsupported type")
+
+
+def semantic_logical_value(value: object) -> LogicalValue:
+    """Return the shared immutable, type-preserving logical normalization."""
+    return _logical(value)
+
+
+def semantic_logical_fingerprint(value: object) -> str:
+    """Fingerprint a logical value without declaring a normative wire encoding."""
+    return hashlib.sha256(_encode(_logical(value))).hexdigest()
 
 
 def semantic_command_fingerprint(command: CreateTaskCommand) -> str:

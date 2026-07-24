@@ -46,3 +46,60 @@ inspection, thread creation, or global state mutation.
 the applicable `KERNEL_CONFORMANCE.md` scenario identifiers. Passing these tests
 demonstrates only this narrow slice; it does not imply full behavioral,
 adversarial, replay, operational, or overall kernel conformance.
+
+## Capability-neutral runtime skeleton
+
+`aios_kernel.runtime` supplies the minimum forward runtime boundary without
+adding a business capability. Its explicit execution sequence is:
+
+1. validate structure, live traffic, schema, operation, and operation version
+   without Organization effects (support-resolution Model A);
+2. pass the exact immutable `AdmissionClaim` to the injected trusted
+   `RecordingBoundaryResolver`;
+3. after `AdmissionEstablished`, bind its canonical Organization and Actor,
+   then read history, inspect Organization/Actor-scoped idempotency, and check
+   the expected Organization position;
+4. invoke authorization governance and then the deterministic handler; and
+5. atomically record acceptance/domain/audit Events or an attributable
+   rejection/audit sequence through deferred materialization.
+
+Malformed or unsupported input and `AdmissionDenied` return a typed
+non-recorded rejection. They read no Organization stream, inspect no
+Organization idempotency state, allocate no authoritative identifier, and
+invoke neither governance nor handling. A syntactically valid identifier is not
+boundary proof. Establishment binds completed genesis, exact stable Organization
+and Actor identities, invocation proof, and immutable authentication evidence.
+It authenticates attribution but grants no Authority; governance remains the
+separate authorization boundary. Handlers receive canonical identities but no
+authentication-provider evidence.
+
+Future capability handlers implement `CommandHandler` and return immutable
+`DomainEventProposal` values. They do not assign Event identity or ordering and
+must not perform kernel governance. Time and identifiers come from the existing
+`Clock` and `IdentifierAllocator` ports; the runtime contains no defaults or
+ambient service lookup. Handler registration is an explicit constructor value.
+Accepted and attributable rejected outcomes record their audit identity, outcome,
+and immutable facts in `AuditLinked`, so replay can reconstruct the audit trace.
+An append race returns before the builder runs and therefore cannot allocate IDs
+or overwrite accepted history.
+
+Runtime exact redelivery is scoped by the admitted canonical Organization,
+admitted Actor, operation family, and idempotency key. Its semantic fingerprint
+includes all material ordinary Command facts, including
+`invocation_proof_reference`, while excluding only delivery `message_id`.
+Admission denial never registers or inspects this state. Atomic append rechecks
+both idempotency and the authoritative Organization position before invoking the
+deferred builder, so duplicates, conflicts, and append races cannot allocate or
+partially record authoritative data. Bootstrap remains on its distinct reserved
+pre-Organization constitutional path and never uses this ordinary resolver.
+
+`replay` folds an already ordered Event stream through a supplied pure
+`ProjectionReducer`. It neither submits Commands nor invokes handlers,
+governance evaluation, adapters, or other effects. The in-memory runtime store
+under `reference/` is deterministic test support only.
+
+This skeleton deliberately defers complete governance implementations,
+production persistence, projection catalogs, domain
+capabilities, bootstrap, scheduling, subscriptions, Tools, memory retrieval,
+networking, agents, and models. It is a foundation for those separately governed
+increments, not a claim of full kernel conformance.

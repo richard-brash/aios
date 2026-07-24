@@ -12,7 +12,7 @@ from aios_kernel.transaction import TransactionStatus
 from aios_protocol.commands import ResourceDimension, ResourceEstimate
 from aios_protocol.dispositions import PreviouslyAdmitted
 from aios_protocol.identifiers import (
-    ActorId, ApprovalId, AuthorityGrantId, DecisionId, GoalId,
+    ActorId, ApprovalId, AuthorityGrantId, DecisionId, GoalId, IntegrityReference,
     MessageId, OrganizationId, ResourceId, StreamId,
 )
 from aios_protocol.reason_codes import ReasonCode
@@ -57,6 +57,7 @@ class SemanticCommandIdentityTests(unittest.TestCase):
             replace_submission(base,envelope=dataclasses.replace(env,initiating_actor_id=ActorId("actor-2"))),
             replace_submission(base,operation_version=RecordTypeVersion("2.0")),
             replace_submission(base,idempotency_key="idem-2"),
+            replace_submission(base,invocation_proof_reference=IntegrityReference("proof-2")),
             replace_submission(base,operation_type="CreateTaskAlternate"),
         )
         original=semantic_command_fingerprint(base)

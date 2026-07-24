@@ -37,7 +37,7 @@ def command(org=OrganizationId("org-1"), **changes):
       "internal","create proposed task","CreateTask",PayloadVersion("1.0"))
     sub=CommandSubmission(env,CommandId("command-1"),OperationId("operation-1"),"CreateTask",V,
       (EntityReference("Task","task-1",0),),"idem-1",GoalWorkRoot(GoalId("goal-1")),True,
-      (AuthorityGrantId("grant-1"),),("policy-1",),DecisionId("decision-1"),(),(),FrozenMap(),RiskClass.REVERSIBLE,
+      IntegrityReference("proof-1"),(AuthorityGrantId("grant-1"),),("policy-1",),DecisionId("decision-1"),(),(),FrozenMap(),RiskClass.REVERSIBLE,
       Reversibility(True,IntegrityReference("restore-1"),"event replay","before assignment"),(),FrozenMap({"state":"proposed"}),FrozenMap({"incident":"stop"}),None)
     values=dict(submission=sub,proposed_task_id="task-1",title="Draft plan",purpose="Produce reviewable proposal",
                 initial_state=InitialTaskState.PROPOSED,expected_stream_position=0)

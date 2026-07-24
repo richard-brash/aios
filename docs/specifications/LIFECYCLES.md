@@ -45,7 +45,19 @@ stateDiagram-v2
 - `Dissolving -> Archived` is Human-reserved and requires legal, commitment, asset, records, and retention checks.
 - Deletion is Human-reserved and permitted only for an unactivated proposal or after dissolution, retention expiry, legal-hold clearance, dependency review, and lawful tombstone creation. An active Organization cannot be deleted.
 
-## 3. Employee
+## 3. Role
+
+```mermaid
+stateDiagram-v2
+    [*] --> Draft: RoleCreated (ordinary post-genesis)
+```
+
+- `[nonexistent] -> draft` is the sole legal initial transition for an ordinarily created post-genesis Role.
+- Ordinary Role creation MUST NOT transition directly to `active`. Activation is a separate governed action and requires an explicitly admitted transition; this section does not authorize or define its future preconditions.
+- Every other unspecified Role transition remains rejected under the common transition rule.
+- The constitutional owner or governor Role established within the atomic bootstrap transaction is a distinct reserved genesis establishment. It is not an ordinary `RoleCreated` transition and MUST NOT be recreated after genesis.
+
+## 4. Employee
 
 ```mermaid
 stateDiagram-v2
@@ -69,7 +81,7 @@ stateDiagram-v2
 - Offboarding is Policy-required for Employees. Ending a Human employment relationship is separately Human-reserved where applicable. Termination revokes Grants, credentials, active assignments, and worker sponsorship after safe handoff.
 - Employee identity and attribution are never deleted; archival preserves continuity records.
 
-## 4. Temporary Worker
+## 5. Temporary Worker
 
 ```mermaid
 stateDiagram-v2
@@ -95,7 +107,7 @@ stateDiagram-v2
 - Terminal states cannot return to active. Archival occurs only after result handoff, resource reconciliation, and credential revocation.
 - Expiry, completion, revocation, and archival end operational availability but never delete or reuse the worker's persistent Actor identity. Historical Events, Decisions, Artifacts, and Audit Records MUST continue to resolve it.
 
-## 5. Goal
+## 6. Goal
 
 ```mermaid
 stateDiagram-v2
@@ -119,7 +131,7 @@ stateDiagram-v2
 - Completion requires an authorized Decision based on pinned evidence satisfying current success criteria. Where completion is an A4 or Human-reserved A3 disposition, the accountable decider is an eligible Human or valid Human Governing Body process; every separately required Approval must also be present.
 - Cancellation is Policy-required and must account for commitments, dependent Tasks, Resources, Artifacts, and records. Completed and cancelled Goals cannot reactivate; materially renewed work creates a new Goal.
 
-## 6. Task
+## 7. Task
 
 Task lifecycle does not require a Project, Objective, or Plan. Those are optional planning structures, and a Task may attach directly to its Goal or duty Work Root. Schedules and assignments may be proposed by Employees, planners, workflow services, or organizational processes; the kernel admits Commands and enforces valid transitions but does not choose scheduling strategy.
 
@@ -153,7 +165,7 @@ stateDiagram-v2
 - Completion requires result evidence and acceptance-criteria evaluation; consequential outputs require the Decision and Approval specified by Policy. Failure records attempted work and effects.
 - Cancellation is Policy-required when commitments or external effects exist; otherwise Authorized by the Goal owner. Terminal Tasks do not reopen. Retry is a new Task or an explicitly modeled attempt under the same still-active Task.
 
-## 7. Approval
+## 8. Approval
 
 ```mermaid
 stateDiagram-v2
@@ -185,7 +197,7 @@ stateDiagram-v2
 - Expiry and satisfaction of a use limit are Automatic. Revocation is Authorized by the approver or superior eligible authority. Material change to scope, cost, risk, evidence, assumptions, Policy, `decision_content_version`, or recurring action class invalidates the Approval automatically.
 - A bounded or standing Approval may be archived only after expiry, revocation, invalidation, or authorized retirement; its uses, effect, and evidence remain auditable.
 
-## 8. Authority Grant
+## 9. Authority Grant
 
 ```mermaid
 stateDiagram-v2
@@ -212,7 +224,7 @@ stateDiagram-v2
 - Expiry is Automatic and irreversible. Revocation is Authorized by the Issuer or superior eligible authority and prevents new actions. Supersession requires a new valid Grant; it cannot rewrite the old Grant.
 - Expansion, later expiry, broader resources, higher risk, or added delegation creates a new Grant and requires fresh approval as applicable.
 
-## 9. Incident
+## 10. Incident
 
 ```mermaid
 stateDiagram-v2
@@ -235,7 +247,7 @@ stateDiagram-v2
 - Resolution requires documented cause or acknowledged uncertainty, impact, remediation evidence, unresolved risk, and follow-up. Closure is Policy-required and must be performed by an eligible reviewer independent enough for severity.
 - Reopening is Authorized on new evidence, recurrence, failed remediation, or audit finding. Archival is permitted only after closure, required notifications, Tasks, legal holds, and reviews are complete.
 
-## 10. Memory Record
+## 11. Memory Record
 
 ```mermaid
 stateDiagram-v2
@@ -267,7 +279,7 @@ stateDiagram-v2
 - Archival follows retention Policy and active-use checks. Redaction or deletion requires valid authority, purpose, scope, dependency, legal-hold, audit-impact, and propagation checks. Human approval is required when Policy or law reserves it.
 - Deletion leaves a nonreconstructive tombstone and later deletion Event and never conceals wrongdoing or silently rewrites immutable Event history. Sensitive or erasable content SHOULD normally be held behind stable governed references. Redaction, sealing, access restriction, or cryptographic erasure MAY make that content unavailable when Policy or law requires, while replay deterministically preserves the availability state and never re-exposes removed content.
 
-## 11. Artifact
+## 12. Artifact
 
 ```mermaid
 stateDiagram-v2

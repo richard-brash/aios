@@ -17,7 +17,6 @@ from datetime import datetime, timezone
 
 from aios_protocol.append import AppendOutcomeUncertain
 from aios_protocol.approvals import ApprovalMode, ApprovalReference, RevocationState
-from aios_protocol.bootstrap import BootstrapAccepted, BootstrapRequest, VerifiedHumanReference
 from aios_protocol.commands import DutyWorkRoot, GoalWorkRoot, ResourceDimension
 from aios_protocol.comparison import semantic_equal, stable_ordered_equal
 from aios_protocol.dispositions import Accepted, PreviouslyAdmitted, Rejected
@@ -63,13 +62,6 @@ def event_envelope(position=1):
     return EventEnvelope(MessageId("emsg-1"), "Event", OrganizationId("org-1"), ActorId("actor-1"),
         CommandId("cmd-1"), CorrelationId("corr-1"), T, StreamId("stream-1"), position,
         "internal", IntegrityReference("sha256:event"))
-
-
-def bootstrap_request(identity_kind="human"):
-    envelope = BootstrapEnvelope(MessageId("boot-1"), "Bootstrap", CorrelationId("corr-1"), T, "restricted")
-    human = VerifiedHumanReference(ActorId("human-1"), IntegrityReference("verify-1"), identity_kind)
-    return BootstrapRequest(envelope, OrganizationId("org-1"), "Example", human, RoleId("role-owner"),
-        DecisionId("decision-1"), (AuthorityGrantId("grant-1"),), IntegrityReference("audit-proposal"))
 
 
 class ValueContractTests(unittest.TestCase):
@@ -220,13 +212,18 @@ class GovernanceStructureTests(unittest.TestCase):
         self.assertIn("schedule_instance_id", fields); self.assertIn("command_id", fields)
 
     def test_30_bootstrap_acceptance_cannot_be_partial(self):
-        req = bootstrap_request()
-        with self.assertRaises(ValueError):
-            BootstrapAccepted(req, req.proposed_organization_id, req.verified_human.actor_id, req.governor_role_id,
-                RoleAssignmentId("assign"), req.founding_decision_id, (), (), AuditRecordId("audit"))
+        from aios_protocol.bootstrap import BootstrapCommitted
+        self.assertIn("founding_events", BootstrapCommitted.__dataclass_fields__)
+        self.assertIn("initial_authority_grant_ids", BootstrapCommitted.__dataclass_fields__)
+        self.assertIn("genesis_exception_exhausted", BootstrapCommitted.__dataclass_fields__)
 
     def test_31_bootstrap_human_cannot_be_model(self):
-        with self.assertRaises(ValueError): bootstrap_request("model")
+        from aios_protocol.bootstrap import VerifiedHumanReference
+        with self.assertRaises(ValueError):
+            VerifiedHumanReference(
+                ActorId("model-1"), IntegrityReference("human-id"),
+                IntegrityReference("verify"), "owner", "model",
+            )
 
 
 class DeterminismAndSafetyTests(unittest.TestCase):

@@ -11,3 +11,17 @@ SCENARIO_MAP = {
   65:"ADV-001",66:"ADV-002",67:"ADV-002",68:"ADV-002",69:"ADV-002",70:"RPL-003",71:"RPL-004",72:"EVT-002",
   73:"AUD-009",74:"RPL-005",75:"RPL-005",76:"CMD-003",77:"CMD-003",78:"CMD-002",79:"WRT-006",80:"TOL-002",
 }
+
+# Constitutional bootstrap runtime coverage; this remains slice evidence rather
+# than a claim of full kernel conformance.
+BOOTSTRAP_SCENARIO_MAP = {
+  "valid_genesis": ("BST-001", "BST-003", "BST-004", "BST-011", "BST-012"),
+  "atomic_append": ("BST-001", "BST-002", "BST-004"),
+  "ordinary_work_excluded": ("BST-005",),
+  "exact_redelivery": ("BST-006",),
+  "competing_genesis": ("BST-007",),
+  "human_owner_and_decider": ("BST-008", "BST-011"),
+  "genesis_authority_contained": ("BST-010",),
+  "reserved_types": ("BST-012",),
+  "replay": ("RPL-003", "RPL-005"),
+}

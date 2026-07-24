@@ -1,4 +1,4 @@
-"""Executable form of the 52 normative KERNEL_PROTOCOL reason codes."""
+"""Executable form of the 65 normative KERNEL_PROTOCOL reason codes."""
 
 from __future__ import annotations
 
@@ -39,8 +39,11 @@ class ReasonCode(str, Enum):
     WORK_ROOT_DUAL = "WORK_ROOT.DUAL"
     WORK_ROOT_INACTIVE = "WORK_ROOT.INACTIVE"
     WORK_ROOT_INCOMPLETE = "WORK_ROOT.INCOMPLETE"
+    WORK_ROOT_INVALID_KIND = "WORK_ROOT.INVALID_KIND"
     DECISION_MISSING = "DECISION.MISSING"
     DECISION_INCOMPLETE = "DECISION.INCOMPLETE"
+    DECISION_ACCOUNTABLE_DECIDER_INVALID = "DECISION.ACCOUNTABLE_DECIDER_INVALID"
+    DECISION_CURRENT_CONDITIONS_INVALID = "DECISION.CURRENT_CONDITIONS_INVALID"
     APPROVAL_MISSING = "APPROVAL.MISSING"
     APPROVAL_EXPIRED = "APPROVAL.EXPIRED"
     APPROVAL_REVOKED = "APPROVAL.REVOKED"
@@ -54,6 +57,8 @@ class ReasonCode(str, Enum):
     STATE_STALE_VERSION = "STATE.STALE_VERSION"
     IDEMPOTENCY_CONFLICT = "IDEMPOTENCY.CONFLICT"
     STREAM_CONCURRENCY_CONFLICT = "STREAM.CONCURRENCY_CONFLICT"
+    EVENT_FIELD_APPLICABILITY_INVALID = "EVENT.FIELD_APPLICABILITY_INVALID"
+    EVENT_PROHIBITED_FIELD = "EVENT.PROHIBITED_FIELD"
     APPEND_FAILED = "APPEND.FAILED"
     APPEND_OUTCOME_UNCERTAIN = "APPEND.OUTCOME_UNCERTAIN"
     SUBSCRIPTION_UNAUTHORIZED = "SUBSCRIPTION.UNAUTHORIZED"
@@ -66,12 +71,20 @@ class ReasonCode(str, Enum):
     RECONCILIATION_REQUIRED = "RECONCILIATION.REQUIRED"
     AUDIT_LINKAGE_MISSING = "AUDIT.LINKAGE_MISSING"
     BOOTSTRAP_INCOMPLETE = "BOOTSTRAP.INCOMPLETE"
+    BOOTSTRAP_GENESIS_TYPE_INVALID = "BOOTSTRAP.GENESIS_TYPE_INVALID"
+    BOOTSTRAP_GENESIS_SCOPE_INVALID = "BOOTSTRAP.GENESIS_SCOPE_INVALID"
+    BOOTSTRAP_IDENTITY_QUARANTINED = "BOOTSTRAP.IDENTITY_QUARANTINED"
+    BOOTSTRAP_COMPETING_GENESIS = "BOOTSTRAP.COMPETING_GENESIS"
     INCIDENT_SUSPENDED = "INCIDENT.SUSPENDED"
     OPERATION_TIMEOUT = "OPERATION.TIMEOUT"
     OPERATION_CANCELLED = "OPERATION.CANCELLED"
     RETRY_PROHIBITED = "RETRY.PROHIBITED"
     GOVERNANCE_DEPENDENCY_UNAVAILABLE = "GOVERNANCE.DEPENDENCY_UNAVAILABLE"
     INTEGRITY_VERIFICATION_FAILED = "INTEGRITY.VERIFICATION_FAILED"
+    RELATIONSHIP_INTEGRITY_CONFLICT = "RELATIONSHIP.INTEGRITY_CONFLICT"
+    CONTENT_GOVERNED_UNAVAILABLE = "CONTENT.GOVERNED_UNAVAILABLE"
+    CONTENT_CRYPTOGRAPHICALLY_ERASED = "CONTENT.CRYPTOGRAPHICALLY_ERASED"
+    SCHEDULE_TRIGGER_CONFLICT = "SCHEDULE.TRIGGER_CONFLICT"
 
     @property
     def metadata(self) -> "ReasonMetadata":
@@ -109,8 +122,11 @@ _MEANINGS = {
     ReasonCode.WORK_ROOT_DUAL: "Both Goal and duty Work Roots were supplied",
     ReasonCode.WORK_ROOT_INACTIVE: "Work Root is not current for new work",
     ReasonCode.WORK_ROOT_INCOMPLETE: "Duty Work Root lacks a mandatory component",
+    ReasonCode.WORK_ROOT_INVALID_KIND: "A non-Goal, non-duty type was claimed as Work Root",
     ReasonCode.DECISION_MISSING: "Required consequential Decision is absent",
     ReasonCode.DECISION_INCOMPLETE: "Decision or audit fields are incomplete",
+    ReasonCode.DECISION_ACCOUNTABLE_DECIDER_INVALID: "Human-reserved Decision lacks an eligible accountable decider",
+    ReasonCode.DECISION_CURRENT_CONDITIONS_INVALID: "Current execution conditions no longer support the historical Decision",
     ReasonCode.APPROVAL_MISSING: "A required Approval is absent",
     ReasonCode.APPROVAL_EXPIRED: "Approval is expired",
     ReasonCode.APPROVAL_REVOKED: "Approval is revoked",
@@ -124,6 +140,8 @@ _MEANINGS = {
     ReasonCode.STATE_STALE_VERSION: "Expected entity or projection version is stale",
     ReasonCode.IDEMPOTENCY_CONFLICT: "Identity or idempotency key was reused for different semantics",
     ReasonCode.STREAM_CONCURRENCY_CONFLICT: "Expected prior stream position differs",
+    ReasonCode.EVENT_FIELD_APPLICABILITY_INVALID: "Event field applicability is missing, unresolved, or simulated",
+    ReasonCode.EVENT_PROHIBITED_FIELD: "A field prohibited by the Event schema is present",
     ReasonCode.APPEND_FAILED: "Append is confirmed not committed due to failure",
     ReasonCode.APPEND_OUTCOME_UNCERTAIN: "Append commitment cannot be established",
     ReasonCode.SUBSCRIPTION_UNAUTHORIZED: "Subscriber lacks required scope, purpose, or Grant",
@@ -135,13 +153,21 @@ _MEANINGS = {
     ReasonCode.TOOL_EVIDENCE_CONTRADICTORY: "Material Tool observations conflict",
     ReasonCode.RECONCILIATION_REQUIRED: "Safe state requires reconciliation",
     ReasonCode.AUDIT_LINKAGE_MISSING: "Mandatory consequential trace is absent",
-    ReasonCode.BOOTSTRAP_INCOMPLETE: "Founding atomic set is invalid or partial",
+    ReasonCode.BOOTSTRAP_INCOMPLETE: "Proposed founding set is incomplete before commit",
+    ReasonCode.BOOTSTRAP_GENESIS_TYPE_INVALID: "Bootstrap type or classification is not reserved genesis",
+    ReasonCode.BOOTSTRAP_GENESIS_SCOPE_INVALID: "Genesis includes prohibited ordinary work or reuses exhausted authority",
+    ReasonCode.BOOTSTRAP_IDENTITY_QUARANTINED: "Proposed Organization identity has uncertain genesis state",
+    ReasonCode.BOOTSTRAP_COMPETING_GENESIS: "A materially different genesis conflicts with the registered attempt",
     ReasonCode.INCIDENT_SUSPENDED: "Incident control blocks the operation",
     ReasonCode.OPERATION_TIMEOUT: "Required observation is absent by deadline",
     ReasonCode.OPERATION_CANCELLED: "Future operation was cancelled",
     ReasonCode.RETRY_PROHIBITED: "Retry lacks required proof or approved duplicate risk",
     ReasonCode.GOVERNANCE_DEPENDENCY_UNAVAILABLE: "Governance dependency is unavailable",
     ReasonCode.INTEGRITY_VERIFICATION_FAILED: "Integrity proof, checkpoint, or history is invalid",
+    ReasonCode.RELATIONSHIP_INTEGRITY_CONFLICT: "Derived relationship state conflicts with canonical state",
+    ReasonCode.CONTENT_GOVERNED_UNAVAILABLE: "Governed availability forbids or cannot provide referenced content",
+    ReasonCode.CONTENT_CRYPTOGRAPHICALLY_ERASED: "Referenced content was cryptographically erased",
+    ReasonCode.SCHEDULE_TRIGGER_CONFLICT: "Schedule trigger conflicts with its registered instance",
 }
 
 
@@ -150,18 +176,22 @@ _NEVER = {
     ReasonCode.ORG_BOUNDARY_VIOLATION, ReasonCode.AUTH_DELEGATION_INVALID,
     ReasonCode.IDEMPOTENCY_CONFLICT, ReasonCode.REPLAY_SIDE_EFFECT_VIOLATION,
     ReasonCode.TOOL_SCOPE_VIOLATION, ReasonCode.ADAPTER_IDENTITY_INVALID,
-    ReasonCode.OPERATION_CANCELLED,
+    ReasonCode.OPERATION_CANCELLED, ReasonCode.BOOTSTRAP_GENESIS_SCOPE_INVALID,
+    ReasonCode.BOOTSTRAP_COMPETING_GENESIS, ReasonCode.CONTENT_CRYPTOGRAPHICALLY_ERASED,
 }
 _RECONCILE = {
     ReasonCode.RESOURCE_UNVERIFIED, ReasonCode.APPEND_OUTCOME_UNCERTAIN,
     ReasonCode.EXTERNAL_OUTCOME_UNKNOWN, ReasonCode.TOOL_EVIDENCE_CONTRADICTORY,
     ReasonCode.RECONCILIATION_REQUIRED, ReasonCode.OPERATION_TIMEOUT,
+    ReasonCode.BOOTSTRAP_IDENTITY_QUARANTINED, ReasonCode.SCHEDULE_TRIGGER_CONFLICT,
 }
 _INCIDENT_REQUIRED = {
     ReasonCode.IDENTITY_FORGED, ReasonCode.RESOURCE_EXCEEDED,
     ReasonCode.APPEND_OUTCOME_UNCERTAIN, ReasonCode.REPLAY_SIDE_EFFECT_VIOLATION,
     ReasonCode.TOOL_SCOPE_VIOLATION, ReasonCode.ADAPTER_IDENTITY_INVALID,
     ReasonCode.BOOTSTRAP_INCOMPLETE, ReasonCode.INTEGRITY_VERIFICATION_FAILED,
+    ReasonCode.BOOTSTRAP_GENESIS_SCOPE_INVALID, ReasonCode.BOOTSTRAP_IDENTITY_QUARANTINED,
+    ReasonCode.BOOTSTRAP_COMPETING_GENESIS, ReasonCode.RELATIONSHIP_INTEGRITY_CONFLICT,
 }
 _ESCALATION_REQUIRED = {
     ReasonCode.AUTH_DELEGATION_INVALID, ReasonCode.POLICY_UNAVAILABLE,
@@ -171,7 +201,10 @@ _ESCALATION_REQUIRED = {
     ReasonCode.TOOL_EVIDENCE_CONTRADICTORY, ReasonCode.AUDIT_LINKAGE_MISSING,
     ReasonCode.BOOTSTRAP_INCOMPLETE, ReasonCode.RETRY_PROHIBITED,
     ReasonCode.GOVERNANCE_DEPENDENCY_UNAVAILABLE,
-    ReasonCode.INTEGRITY_VERIFICATION_FAILED,
+    ReasonCode.INTEGRITY_VERIFICATION_FAILED, ReasonCode.DECISION_ACCOUNTABLE_DECIDER_INVALID,
+    ReasonCode.BOOTSTRAP_GENESIS_TYPE_INVALID, ReasonCode.BOOTSTRAP_GENESIS_SCOPE_INVALID,
+    ReasonCode.BOOTSTRAP_IDENTITY_QUARANTINED, ReasonCode.BOOTSTRAP_COMPETING_GENESIS,
+    ReasonCode.RELATIONSHIP_INTEGRITY_CONFLICT,
 }
 
 

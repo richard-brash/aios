@@ -1,7 +1,7 @@
 """Deterministic ordinary creation of one draft Role on an Organization stream."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Protocol
 
@@ -28,13 +28,17 @@ CREATE_ROLE_OPERATION = "CreateRole"
 CREATE_ROLE_VERSION = RECORD_V1
 ROLE_CREATED_EVENT = "RoleCreated"
 ROLE_CREATED_VERSION = RECORD_V1
+ROLE_ACTIVATED_EVENT = "RoleActivated"
+ROLE_ACTIVATED_VERSION = RECORD_V1
 _SUPPORTED_ORGANIZATION_HISTORY_EVENTS = frozenset({
     "CommandAccepted", "CommandRejected", "AuditLinked",
-    "TaskCreated", "DecisionLinked", "WorkRootLinked", ROLE_CREATED_EVENT,
+    "TaskCreated", "DecisionLinked", "WorkRootLinked",
+    ROLE_CREATED_EVENT, ROLE_ACTIVATED_EVENT,
 })
 _ACCEPTED_DOMAIN_SEQUENCES = FrozenMap({
     "CreateTask": ("TaskCreated", "DecisionLinked", "WorkRootLinked"),
     CREATE_ROLE_OPERATION: (ROLE_CREATED_EVENT,),
+    "ActivateRole": (ROLE_ACTIVATED_EVENT,),
 })
 
 
@@ -130,11 +134,13 @@ class OrganizationRoleReducer:
         return self._initial
 
     def apply(self,state: OrganizationRoleProjection,event: EventRecord) -> OrganizationRoleProjection:
-        if event.event_type != ROLE_CREATED_EVENT:
+        if event.event_type not in (ROLE_CREATED_EVENT,ROLE_ACTIVATED_EVENT):
             return OrganizationRoleProjection(
                 state.organization_id,state.genesis_completed,state.founding_role_id,
                 state.roles,event.envelope.stream_position,
             )
+        if event.event_type == ROLE_ACTIVATED_EVENT:
+            return self._apply_role_activated(state,event)
         if event.event_version != ROLE_CREATED_VERSION or event.envelope.schema_version != RECORD_V1:
             raise ValueError("RoleCreated version is unsupported")
         attributes=event.payload.get("role")
@@ -163,6 +169,44 @@ class OrganizationRoleReducer:
         return OrganizationRoleProjection(
             state.organization_id,state.genesis_completed,state.founding_role_id,
             state.roles+(role,),event.envelope.stream_position,
+        )
+
+    def _apply_role_activated(
+        self,state: OrganizationRoleProjection,event: EventRecord,
+    ) -> OrganizationRoleProjection:
+        expected_fields={
+            "role_id","prior_lifecycle_state","lifecycle_state",
+            "prior_entity_revision","entity_revision",
+        }
+        if set(event.payload) != expected_fields:
+            raise ValueError("RoleActivated payload is malformed")
+        role_id=event.payload.get("role_id")
+        if type(role_id) is not RoleId:
+            raise ValueError("RoleActivated Role identity is malformed")
+        role=state.role(role_id)
+        if role is None:
+            raise ValueError("RoleActivated targets a nonexistent Role")
+        prior_revision=event.payload.get("prior_entity_revision")
+        resulting_revision=event.payload.get("entity_revision")
+        if (event.payload.get("prior_lifecycle_state") != "draft"
+                or event.payload.get("lifecycle_state") != "active"
+                or role.lifecycle_state != "draft"):
+            raise ValueError("RoleActivated source state is invalid")
+        if (type(prior_revision) is not int or type(resulting_revision) is not int
+                or prior_revision != role.entity_revision
+                or resulting_revision != prior_revision+1):
+            raise ValueError("RoleActivated revision transition is invalid")
+        references=tuple(event.entity_references)
+        if (len(references) != 1 or references[0].entity_type != "Role"
+                or references[0].entity_id != str(role_id)
+                or references[0].expected_version != resulting_revision):
+            raise ValueError("RoleActivated lacks its resulting entity revision reference")
+        activated=replace(role,lifecycle_state="active",entity_revision=resulting_revision)
+        roles=tuple(activated if existing.role_id == role_id else existing
+                    for existing in state.roles)
+        return OrganizationRoleProjection(
+            state.organization_id,state.genesis_completed,state.founding_role_id,
+            roles,event.envelope.stream_position,
         )
 
 
@@ -229,16 +273,22 @@ def _same_execution_lineage(first: EventRecord,second: EventRecord) -> bool:
 
 
 def _validate_command_accepted(event: EventRecord) -> tuple[str,RecordTypeVersion]:
+    operation=event.payload.get("operation_type")
+    references=tuple(event.entity_references)
+    expected_entity_type=("Task" if operation == "CreateTask" else "Role")
     if (
         set(event.payload) != {"operation_type","operation_version","disposition_id"}
-        or event.payload.get("operation_type") not in _ACCEPTED_DOMAIN_SEQUENCES
+        or operation not in _ACCEPTED_DOMAIN_SEQUENCES
         or event.payload.get("operation_version") != RECORD_V1
         or not event.payload.get("disposition_id")
-        or event.entity_references
+        or len(references) != 1
+        or references[0].entity_type != expected_entity_type
+        or type(references[0].expected_version) is not int
+        or references[0].expected_version < 0
         or event.causal_reference is not None
     ):
         raise ValueError("CommandAccepted is not a supported ordinary acceptance")
-    return event.payload["operation_type"],event.payload["operation_version"]
+    return operation,event.payload["operation_version"]
 
 
 def _validate_role_created_lineage(accepted: EventRecord,event: EventRecord) -> None:
@@ -246,6 +296,24 @@ def _validate_role_created_lineage(accepted: EventRecord,event: EventRecord) -> 
         raise ValueError("RoleCreated lineage does not match its accepted Command")
     if event.causal_reference != str(event.envelope.recording_command_id):
         raise ValueError("RoleCreated causal Command linkage is inconsistent")
+    role=event.payload.get("role")
+    reference=accepted.entity_references[0]
+    if (type(role) is not RoleCreationAttributes
+            or reference.entity_id != str(role.role_id)
+            or reference.expected_version != 0):
+        raise ValueError("RoleCreated identity does not match its accepted target")
+
+
+def _validate_role_activated_lineage(accepted: EventRecord,event: EventRecord) -> None:
+    if not _same_execution_lineage(accepted,event):
+        raise ValueError("RoleActivated lineage does not match its accepted Command")
+    if event.causal_reference != str(event.envelope.recording_command_id):
+        raise ValueError("RoleActivated causal Command linkage is inconsistent")
+    reference=accepted.entity_references[0]
+    if (type(event.payload.get("role_id")) is not RoleId
+            or reference.entity_id != str(event.payload["role_id"])
+            or reference.expected_version != event.payload.get("prior_entity_revision")):
+        raise ValueError("RoleActivated identity or revision does not match its accepted target")
 
 
 def _validate_create_task_event(accepted: EventRecord,event: EventRecord) -> None:
@@ -260,6 +328,9 @@ def _validate_create_task_event(accepted: EventRecord,event: EventRecord) -> Non
     task_id=event.payload.get("task_id")
     if task_id != task_references[0].entity_id or event.payload.get("decision_id") is None:
         raise ValueError("CreateTask domain Event payload is inconsistent")
+    accepted_reference=accepted.entity_references[0]
+    if (accepted_reference.entity_id != task_id or accepted_reference.expected_version != 0):
+        raise ValueError("CreateTask identity does not match its accepted target")
     if event.event_type == "TaskCreated":
         required={"task_id","decision_id","title","purpose","lifecycle_state","entity_version"}
         if (set(event.payload)!=required or event.payload.get("lifecycle_state")!="proposed"
@@ -343,6 +414,8 @@ def replay_organization_roles(
             raise ValueError("accepted operation lacks its AuditLinked Event")
         if operation == CREATE_ROLE_OPERATION:
             _validate_role_created_lineage(disposition,domain_events[0])
+        elif operation == "ActivateRole":
+            _validate_role_activated_lineage(disposition,domain_events[0])
         else:
             for event in domain_events:
                 _validate_create_task_event(disposition,event)

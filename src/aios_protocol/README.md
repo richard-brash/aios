@@ -36,6 +36,7 @@ Structural tests map to these `KERNEL_CONFORMANCE.md` suites:
 | --- | --- |
 | identity, time, presence, versions | canonical fixtures; determinism; failure-closed |
 | envelopes and Commands | command admission; Work Root; audit |
+| authenticated admission | recording-boundary resolution; non-recorded pre-boundary denial |
 | dispositions, Events, append | command admission; event ordering and idempotency |
 | Tool and reconciliation records | Tool invocation and reconciliation |
 | Resources and Approvals | resource governance; Approval |
@@ -45,3 +46,11 @@ Structural tests map to these `KERNEL_CONFORMANCE.md` suites:
 
 These tests validate executable structural contracts only. They do not satisfy
 or imply behavioral, adversarial, replay, or operational kernel conformance.
+
+Ordinary post-genesis processing uses the immutable contracts in
+`aios_protocol.admission`: an `AdmissionClaim` is resolved by the trusted
+kernel `RecordingBoundaryResolver` to either `AdmissionEstablished` or
+`AdmissionDenied`. Establishment proves exact Organization and initiating
+Actor attribution, not authorization. Denial is non-authoritative and permits
+no Organization stream, idempotency, audit, or Event effect. Bootstrap retains
+its distinct reserved constitutional admission path.

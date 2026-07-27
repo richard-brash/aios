@@ -16,7 +16,7 @@ This specification is governed by [`ARCHITECTURE_PRINCIPLES.md`](ARCHITECTURE_PR
 - **Implementation under test (IUT):** the complete kernel boundary being evaluated, including any specialized services to which it delegates normative mechanics.
 - **Test harness:** an external observer and fault controller that submits inputs, supplies controlled adapter and external-system behavior, captures outputs, and MUST NOT confer authority.
 - **Canonical fixture:** a versioned, reusable set of stable entities, Events, projections, Policies, and controlled external observations defined by this specification.
-- **Mandatory scenario:** a test whose identifier appears in Sections 12–28 or the adversarial matrix. Every mandatory scenario MUST pass unless its requirement is formally inapplicable to a constitutionally valid implementation; the conformance report MUST justify and independently approve any inapplicability. The suite contains 228 catalog identifiers; a parameterized row may require multiple executions without changing that catalog count.
+- **Mandatory scenario:** a test whose identifier appears in Sections 12–28, Section 13.1, or the adversarial matrix. Every mandatory scenario MUST pass unless its requirement is formally inapplicable to a constitutionally valid implementation; the conformance report MUST justify and independently approve any inapplicability. The suite contains 252 catalog identifiers; a parameterized row may require multiple executions without changing that catalog count.
 - **Disposition:** `accepted`, `rejected`, `previously_admitted`, `paused`, or `escalated` as defined by the kernel admission output contract.
 - **Safe failure:** no unauthorized transition, disclosure, Tool dispatch, Resource or Approval mutation, success assertion, or replay effect; an attributable rejection, pause, suspension, reconciliation, Incident, or escalation is recorded where a valid recording boundary exists.
 - **Exact semantic equality:** equality of every normative field and meaning after canonical normalization, regardless of serialization syntax or field order.
@@ -179,13 +179,14 @@ Every rejection and injected failure MUST prove the absence of unauthorized targ
 
 ## 10. Minimum conformance test matrix
 
-The minimum suite contains 228 mandatory scenarios. Every scenario MUST be instantiated using the normative test-case format in Section 4.5.
+The minimum suite contains 252 mandatory scenarios. Every scenario MUST be instantiated using the normative test-case format in Section 4.5.
 
 | Suite | Identifier range | Mandatory scenarios | Primary contract |
 |---|---|---:|---|
 | Adversarial and fault injection | `ADV-001`–`ADV-022` | 22 | Safe behavior under unavailable, hostile, corrupt, delayed, duplicated, and live-effect conditions |
 | Bootstrap | `BST-001`–`BST-012` | 12 | Atomic constitutional genesis and permanent bootstrap-authority containment |
 | Command admission | `CMD-001`–`CMD-014` | 14 | Validation, attribution, isolation, versions, idempotency, and evaluation time |
+| Authenticated admission boundary | `ADB-001`–`ADB-024` | 24 | Pre-boundary rejection, exact Organization and Actor attribution, mutation prohibition, and bootstrap separation |
 | Authority and Policy | `AUT-001`–`AUT-016` | 16 | Explicit authority, delegation, precedence, and Human accountable-decider power |
 | Work Root | `WRT-001`–`WRT-010` | 10 | Exclusive Goal-or-duty traceability with optional planning structures |
 | Approval | `APR-001`–`APR-014` | 14 | Mode, atomic usage, separation from Authority, and concurrency |
@@ -201,7 +202,7 @@ The minimum suite contains 228 mandatory scenarios. Every scenario MUST be insta
 | Audit and Decisions | `AUD-001`–`AUD-015` | 15 | Complete consequential trace, Decision-state revalidation, and collective attribution |
 | Replay and recovery | `RPL-001`–`RPL-015` | 15 | Projection equivalence, governed availability, history integrity, and zero effects |
 | Portability and model replacement | `POR-001`–`POR-008` | 8 | Institutional continuity across environments and replaceable models |
-| **Total** |  | **228** | All scenarios are independently mandatory |
+| **Total** |  | **252** | All scenarios are independently mandatory |
 
 ## 11. Adversarial and fault-injection matrix
 
@@ -255,7 +256,7 @@ The following cross-cutting fault scenarios are mandatory. Each fault MUST also 
 |---|---|---|
 | CMD-001 | Submit fully valid reversible Command with current versions and gates | Accept; append exact ordered Events, reservation, audit links, and authorized next step |
 | CMD-002 | Submit malformed envelope with no valid organization or attribution boundary | Reject before admission; no Organization Event, projection, reservation, use, dispatch, or delivery |
-| CMD-003 | Submit unsupported Command schema version | Reject with unsupported-schema reason and attributable rejection Event when boundary is valid |
+| CMD-003 | Submit unsupported Command schema or operation version | Return a typed non-recorded pre-boundary rejection; do not resolve admission or touch an Organization namespace |
 | CMD-004 | Alpha Command references Beta Actor, Resource, or Event without governed relationship | Reject without revealing Beta content or existence beyond safe denial |
 | CMD-005 | Submit unknown initiating Actor | Reject; do not infer from credential, model, session, or name |
 | CMD-006 | Submit Command from suspended Actor | Reject or preserve suspension; no new affected work |
@@ -267,6 +268,37 @@ The following cross-cutting fault scenarios are mandatory. Each fault MUST also 
 | CMD-012 | Reuse idempotency key with changed payload, Work Root, or target | Reject idempotency conflict; preserve first disposition |
 | CMD-013 | Redeliver original after wall clock advances beyond Grant expiry | Return original evaluation time and disposition; do not reevaluate as a new Command |
 | CMD-014 | Bind same original inputs to two precommit evaluations | Produce exact semantic equality of disposition and Event set |
+
+### 13.1 Authenticated recording-boundary test suite
+
+This suite proves the ordinary post-genesis boundary between effect-free input handling and attributable Organization processing. Support resolution follows Model A: unsupported schema, operation, or operation version is pre-boundary. Bootstrap uses its reserved constitutional path.
+
+| ID | Input or fault | Required observable result |
+|---|---|---|
+| ADB-001 | Structurally malformed ordinary input | Return a typed non-recorded rejection with no authoritative disposition, Event, audit, stream access, or idempotency effect |
+| ADB-002 | Unsupported schema, operation, or operation version | Return a typed non-recorded rejection before admission resolution and with no Organization effect |
+| ADB-003 | Well-formed but unresolved Organization identifier | Return `ORG.UNKNOWN` without treating identifier syntax as proof or touching an Organization namespace |
+| ADB-004 | Syntactically valid Organization identifier with no authoritative completed-genesis boundary | Fail closed as a non-recorded admission denial |
+| ADB-005 | Unknown or unauthenticated initiating Actor | Return a bounded non-recorded identity denial without Organization mutation |
+| ADB-006 | Authentic Actor identity attributable only to another Organization | Return a non-recorded boundary or identity denial; do not search or fall back across Organizations |
+| ADB-007 | Any admission denial while observing the Event-store read port | Perform no Organization stream read |
+| ADB-008 | Any admission denial while observing append and audit ports | Append no Event and create no authoritative audit record |
+| ADB-009 | Any admission denial while observing authoritative allocators | Allocate no authoritative disposition, Event, or Audit Record identifier |
+| ADB-010 | Any admission denial while observing governance | Do not invoke Organization governance |
+| ADB-011 | Any admission denial while observing domain handling | Do not invoke a domain handler |
+| ADB-012 | Any admission denial while observing Organization idempotency | Inspect and create no Organization-scoped idempotency entry |
+| ADB-013 | Repeat identical admission-denied input | Return an equivalent non-recorded result; do not treat it as Organization exact redelivery or mutate state |
+| ADB-014 | Resolver establishes a boundary whose canonical Organization exactly matches the claim | Bind that exact Organization and its completed-genesis reference; permit later Organization processing only from this proof |
+| ADB-015 | Resolver authenticates and attributes the exact claimed Actor in the established Organization | Bind that exact Actor and authentication evidence; aliases or identity substitution fail closed |
+| ADB-016 | Admission succeeds but operation Authority is absent | Continue to governance, which denies independently; admission success itself grants no Authority |
+| ADB-017 | Governance denies after admission success | May atomically append the specified attributable rejection and audit sequence to the proven Organization stream |
+| ADB-018 | Deterministic handler rejects after admission success | May atomically append the specified attributable rejection and audit sequence to the proven Organization stream |
+| ADB-019 | Exact redelivery of an attributable rejection already recorded after admission | Return the original disposition without another append, allocation, or effect |
+| ADB-020 | Hostile input names an Organization that is not authoritatively resolved | Do not create that Organization stream or any record within it |
+| ADB-021 | Admission-denied input names an Organization other than one with existing history | Preserve the unrelated Organization history exactly |
+| ADB-022 | Bootstrap submission is presented to the ordinary resolver path | Reject before ordinary Organization processing; bootstrap remains on its reserved constitutional admission path |
+| ADB-023 | Ordinary Command claims bootstrap traffic or admission basis | Reject without entering the reserved bootstrap path or mutating either namespace |
+| ADB-024 | Replay authoritative Organization history | Do not invoke admission resolution, authentication, governance, Command handling, or external effects |
 
 ## 14. Authority and Policy test suite
 

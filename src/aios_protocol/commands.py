@@ -130,6 +130,7 @@ class CommandSubmission:
     idempotency_key: str
     work_root: WorkRoot | None
     work_root_required: bool
+    invocation_proof_reference: IntegrityReference
     authority_references: tuple[AuthorityGrantId, ...] = ()
     policy_references: tuple[str, ...] = ()
     decision_reference: DecisionId | None = None
@@ -147,6 +148,10 @@ class CommandSubmission:
         from .identifiers import CommandId
         require_type(self.command_id, CommandId, type(self).__name__, "command_id")
         require_type(self.original_operation_id, OperationId, type(self).__name__, "original_operation_id")
+        require_type(
+            self.invocation_proof_reference, IntegrityReference,
+            type(self).__name__, "invocation_proof_reference",
+        )
         require_nonempty(self.operation_type, type(self).__name__, "operation_type")
         require_nonempty(self.idempotency_key, type(self).__name__, "idempotency_key")
         object.__setattr__(self, "target_references", tuple(self.target_references))

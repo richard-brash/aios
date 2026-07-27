@@ -27,6 +27,7 @@ class ReasonCode(str, Enum):
     IDENTITY_UNKNOWN = "IDENTITY.UNKNOWN"
     IDENTITY_FORGED = "IDENTITY.FORGED"
     IDENTITY_SUSPENDED = "IDENTITY.SUSPENDED"
+    ORG_UNKNOWN = "ORG.UNKNOWN"
     ORG_BOUNDARY_VIOLATION = "ORG.BOUNDARY_VIOLATION"
     AUTH_MISSING = "AUTH.MISSING"
     AUTH_EXPIRED = "AUTH.EXPIRED"
@@ -110,6 +111,7 @@ _MEANINGS = {
     ReasonCode.IDENTITY_UNKNOWN: "Actor cannot be resolved",
     ReasonCode.IDENTITY_FORGED: "Invocation proof does not bind the asserted Actor",
     ReasonCode.IDENTITY_SUSPENDED: "Actor is operationally suspended",
+    ReasonCode.ORG_UNKNOWN: "Claimed Organization cannot be resolved as an authoritative boundary",
     ReasonCode.ORG_BOUNDARY_VIOLATION: "Cross-Organization reference is not authorized",
     ReasonCode.AUTH_MISSING: "No applicable Authority Grant exists",
     ReasonCode.AUTH_EXPIRED: "Authority Grant is expired",

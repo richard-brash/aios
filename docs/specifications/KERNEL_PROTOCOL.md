@@ -178,6 +178,31 @@ Historical Events and replay use the schema, Policy, transition rules, and speci
 
 The caller may assert references only. The kernel resolves Organization, identity, Role, Grants, Policies, Work Root, Decision, Approvals, Resources, lifecycle, evidence access, and current versions. It MUST reject rather than replace an invalid assertion with a broader or different one.
 
+### 5.1 Authenticated recording-boundary contract
+
+`RecordingBoundaryResolver` is the capability-neutral trusted admission port for ordinary post-genesis Commands. It performs no authorization and has no Organization Event-store, idempotency, audit, handler, or append capability. It accepts one immutable `AdmissionClaim` containing exactly:
+
+- `message_id` and `command_id`, binding the resolution to one Command attempt;
+- the claimed stable `organization_id` and `initiating_actor_id` copied from the Command;
+- the Command's `invocation_proof_reference`; and
+- the admission-claim `schema_version`.
+
+The resolver returns the closed union `AdmissionEstablished | AdmissionDenied`.
+
+`AdmissionEstablished` contains the bound claim message and Command identities; the exact canonical Organization and initiating Actor identifiers; immutable Organization-genesis, Actor-identity, invocation-proof, and authentication-evidence references; and the admission-mechanism reference, mechanism version, and result schema version. The Organization MUST exist with completed genesis as an authoritative ordinary recording boundary. The Actor MUST exist as a stable Actor identity and be attributable within that exact Organization, and the trusted mechanism MUST authenticate the invocation proof for that Actor and Command attempt. The result MUST exactly equal the submitted Organization, Actor, Command, message, and proof references. Aliases, display names, email addresses, usernames, external account identifiers, or cross-Organization fallback do not canonicalize a Command identity; a mismatch fails closed.
+
+Only the trusted injected resolver supplies `AdmissionEstablished` to kernel orchestration. It is an authentication and attribution proof, never an Authority Grant, Role Assignment, Policy result, Approval, Decision, or capability. Domain handlers do not inspect it. Governance consumes its canonical Actor and evidence references while independently evaluating permission.
+
+`AdmissionDenied` contains the claim message and Command identities, one stable admission reason code, `failed_gate` (`organization_boundary`, `attribution_authentication`, or `admission_dependency`), bounded `safe_detail`, optional non-authoritative diagnostic facts, and schema version. It contains no authoritative Organization audit or disposition identity and does not prove that the claimed Organization exists. `ORG.UNKNOWN`, `IDENTITY.UNKNOWN`, `IDENTITY.FORGED`, `IDENTITY.SUSPENDED`, `ORG.BOUNDARY_VIOLATION`, and `GOVERNANCE.DEPENDENCY_UNAVAILABLE` are the permitted admission-resolution causes. External detail for unresolved Organizations and identities MUST be equivalently bounded so it does not disclose another Organization or Actor; authorized internal diagnostics MAY retain the more specific code without becoming Organization history.
+
+The ordinary admission sequence uses support-resolution **Model A**. Effect-free validation first checks object/envelope shape, immutable attribution fields, identifier encoding, unknown/forbidden fields, payload decodability, and whether schema, operation, and version are supported. `INPUT.MALFORMED` and `VER.UNSUPPORTED` at this stage are pre-boundary results and MUST NOT invoke the resolver or touch an Organization namespace. The resolver runs next. Only `AdmissionEstablished` permits Organization stream read, expected-position comparison, Organization-scoped idempotency, attributable context construction, governance, handling, authoritative identifier allocation, or recording.
+
+The kernel MAY bind one evaluation time before resolution through its injected effect-free Clock. Pre-boundary failure has optional evaluation time but no authoritative disposition ID, Event ID, Audit Record ID, domain Event, recorded Event, or audit record. It creates and inspects no Organization idempotency entry. Repeated denial is another non-recorded attempt, not exact redelivery. Authentication-provider anti-replay or nonce controls are outside Organization idempotency and are neither represented nor weakened here.
+
+After establishment, the admitted context contains the original immutable Command, canonical Organization and Actor identities, immutable admission proof, bound evaluation time, and prior Organization Events. Governance evaluates authorization; the domain handler evaluates deterministic domain semantics. A later governance or handler denial MAY append an attributable atomic rejection/audit sequence. A stale expected position returns a concurrency conflict without appending through that stale position; append failure cannot claim a durable rejection; idempotency conflict preserves the original registration; invalid history fails closed. Exact redelivery applies only to a previously recorded attributable disposition.
+
+Bootstrap remains on PF-17's reserved pre-Organization constitutional path and does not invoke `RecordingBoundaryResolver`. Ordinary Commands cannot select bootstrap traffic or admission basis. Replay consumes authoritative history and MUST NOT invoke admission resolution or authentication.
+
 Every mutating `CommandSubmission` has an idempotency scope containing at least `(organization_id, initiating_actor_id, operation_family, idempotency_key)`. It also binds `original_operation_id` and the canonical semantic digest or equivalent exact comparison of every material operation field. Exact redelivery returns the original disposition, identifiers, stream positions, evaluation time, Resource effects, Approval-use result, and dispatch identity. Conflicting reuse preserves the first registration, fails closed, and discloses no other Actor's operation or key use.
 
 Decision-bearing Commands use `GovernanceRoleAttribution`: `proposer_actor_ids`, `recommender_actor_ids`, `accountable_decider`, `approver_actor_ids`, `technical_recorder_actor_id`, `initiating_actor_id`, optional `governing_body_disposition`, and individually attributable participation records. Technical initiation, proposal, recommendation, recording, deciding, and Approval are distinct even when one eligible Actor fills several roles.
@@ -188,7 +213,7 @@ For every A4 and Constitution- or Policy-reserved A3 Decision, `accountable_deci
 
 ## 6. Admission disposition family
 
-All dispositions contain the original `command_id`, bound `evaluation_time`, reason-code presence, and audit reference when a valid Organization recording boundary exists.
+All attributable dispositions contain the original `command_id`, bound `evaluation_time`, reason-code presence, and audit reference when a valid Organization recording boundary exists. A pre-boundary `RuntimeRejected` or equivalent typed result has a reason code, failed gate, bounded safe detail, optional evaluation time, absent authoritative disposition identity, no domain or recorded Events, and no authoritative audit record.
 
 For a Decision-bearing Command, every disposition also preserves the submitted and validated `GovernanceRoleAttribution` or the precise role-validation failure. Acceptance MUST NOT collapse proposer, recommender, accountable decider, approver, technical recorder, Governing Body, or initiating Actor into one generic author field.
 
@@ -457,7 +482,7 @@ Closure requires evidence and audit; unavailable or conflicted evidence cannot b
 
 ## 22. Stable reason-code registry
 
-The initial registry contains 65 immutable machine keys formatted `CATEGORY.SPECIFIC_CAUSE`. For every registry row, the component before the period is its explicit normative `category` field and the complete code is its stable identifier. Human-readable `safe_detail` is bounded, localizable, nonauthoritative, and MUST NOT be used for branching. Each failure record also contains `retryability` (`never`, `after_change`, `idempotent_only`, `after_reconciliation`), `reevaluation` (`no`, `allowed`, `required`), `escalation` (`none`, `conditional`, `required`), `incident` (`no`, `consider`, `required`), safe disclosure class, and conformance scenario references.
+The initial registry contains 66 immutable machine keys formatted `CATEGORY.SPECIFIC_CAUSE`. For every registry row, the component before the period is its explicit normative `category` field and the complete code is its stable identifier. Human-readable `safe_detail` is bounded, localizable, nonauthoritative, and MUST NOT be used for branching. Each failure record also contains `retryability` (`never`, `after_change`, `idempotent_only`, `after_reconciliation`), `reevaluation` (`no`, `allowed`, `required`), `escalation` (`none`, `conditional`, `required`), `incident` (`no`, `consider`, `required`), safe disclosure class, and conformance scenario references.
 
 | Code | Meaning | Retryability / reevaluation | Escalation / Incident | Safe disclosure | Conformance |
 |---|---|---|---|---|---|
@@ -468,6 +493,7 @@ The initial registry contains 65 immutable machine keys formatted `CATEGORY.SPEC
 | `IDENTITY.UNKNOWN` | Actor cannot be resolved | after_change / required | conditional / consider | Do not reveal other identities | CMD-005 |
 | `IDENTITY.FORGED` | Invocation proof does not bind Actor | never / no | required / required | Minimal security detail | ADV-016 |
 | `IDENTITY.SUSPENDED` | Actor operationally suspended | after_change / required | conditional / consider | Suspension reference if authorized | CMD-006 |
+| `ORG.UNKNOWN` | Claimed Organization cannot be resolved as an authoritative completed-genesis boundary | after_change / required | conditional / consider | Generic boundary unavailable; do not disclose existence | ADB-003, ADB-004, ADB-020 |
 | `ORG.BOUNDARY_VIOLATION` | Cross-Organization reference not authorized | never / no | conditional / consider | Do not reveal target existence | CMD-004, SUB-003, ADV-019 |
 | `AUTH.MISSING` | No applicable Authority Grant | after_change / required | conditional / no | Required authority class | AUT-008, AUT-014 |
 | `AUTH.EXPIRED` | Grant expired at evaluation time | after_change / required | conditional / no | Grant reference if authorized | AUT-002 |
@@ -544,15 +570,16 @@ The receiver MUST enforce:
 9. type names are stable registry values, not caller-defined aliases; ambiguous or downgraded schemas reject;
 10. human-readable failure detail is bounded, classified, and never includes protected target existence, secrets, raw payloads, or cross-Organization state;
 11. external clocks are observations; kernel-bound `evaluation_time` and `stream_position` control admission and order; and
-12. platform-security telemetry cannot become an Organization Event or authoritative state without a later valid Command.
+12. platform-security telemetry cannot become an Organization Event or authoritative state without a later valid Command; and
+13. ordinary Organization stream access, Organization idempotency, authoritative audit, and identifier allocation require an exact `AdmissionEstablished` proof bound to the Command attempt.
 
 ## 24. Conformance traceability
 
-This matrix maps all 20 protocol families to the final 228 mandatory scenarios across 18 suites in `KERNEL_CONFORMANCE.md`; it does not duplicate their definitions. PF-05 and PF-16 implement the canonical relationship records and PF-03 supplies their accepted Event history, together covering REL.
+This matrix maps all 20 protocol families to the final 252 mandatory scenarios across 19 suites in `KERNEL_CONFORMANCE.md`; it does not duplicate their definitions. The authenticated recording-boundary contract is part of PF-01 Command and PF-02 disposition. PF-05 and PF-16 implement the canonical relationship records and PF-03 supplies their accepted Event history, together covering REL.
 
 | Families | Primary conformance suites |
 |---|---|
-| PF-01 Command, PF-02 disposition | CMD, AUT, WRT, APR, RES, AUD, BST, ADV |
+| PF-01 Command, PF-02 disposition | ADB, CMD, AUT, WRT, APR, RES, AUD, BST, ADV |
 | PF-03 Event, PF-04 append | EVT, CMD, APR, RES, REL, RPL, ADV |
 | PF-05 Projection | EVT, REL, RPL, POR, MEM, ADV |
 | PF-06 Replay | RPL, REL, MEM, POR, ADV |
@@ -575,7 +602,7 @@ These examples show logical fields and relationships. Braces and arrows are expl
 
 ### 25.1 Accepted Command
 
-`CommandSubmission { message_id=msg:cmd:41, command_id=cmd:alpha:41, original_operation_id=op:alpha:41, organization_id=org-alpha, initiating_actor_id=employee-operator, work_root=Goal(goal:launch), planning_references=absent_optional, operation_family=artifact, operation_type=artifact.review, expected_entity_revision=7, grant=grant:a2:active, approval_references=absent_optional, resources={compute:2}, idempotency_key=review/41 }`
+`CommandSubmission { message_id=msg:cmd:41, command_id=cmd:alpha:41, original_operation_id=op:alpha:41, organization_id=org-alpha, initiating_actor_id=employee-operator, invocation_proof_reference=proof:41, work_root=Goal(goal:launch), planning_references=absent_optional, operation_family=artifact, operation_type=artifact.review, expected_entity_revision=7, grant=grant:a2:active, approval_references=absent_optional, resources={compute:2}, idempotency_key=review/41 }`
 
 `AdmissionAccepted[msg:disp:41] { command=cmd:alpha:41, evaluation_time=T100, events=[evt:reserve:41@P88, evt:task-started:41@P89], next_step=employee_work }` (a verified external outcome field is prohibited on acceptance).
 

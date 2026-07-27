@@ -14,7 +14,7 @@ from aios_kernel.reference import (
     DeterministicRecordingBoundaryResolver, InMemoryRuntimeEventStore,
 )
 from aios_kernel.runtime import (
-    HandlerRejected, RuntimeAccepted, RuntimeRejected, replay,
+    AdmissionEvidenceSnapshot, HandlerRejected, RuntimeAccepted, RuntimeRejected, replay,
 )
 from aios_protocol.admission import AdmissionEstablished
 from aios_protocol.envelope import BootstrapEnvelope, TrafficMode
@@ -35,6 +35,15 @@ def replace_submission(command,**changes):
 
 
 class AuthenticatedAdmissionRuntimeTests(unittest.TestCase):
+    def assert_persisted_admission(self,result,admission):
+        expected=AdmissionEvidenceSnapshot.from_established(admission)
+        self.assertEqual(result.audit_record.admission_evidence,expected)
+        audit_link=result.recorded_events[-1]
+        self.assertEqual(audit_link.event_type,"AuditLinked")
+        self.assertEqual(audit_link.payload["admission_evidence"],expected)
+        self.assertEqual(expected.organization_id,admission.organization_id)
+        self.assertEqual(expected.initiating_actor_id,admission.initiating_actor_id)
+
     def assert_no_authoritative_effect(self,store,ids,evaluator,handler):
         self.assertEqual(store._streams,{})
         self.assertEqual(store._idempotency,{})
@@ -179,8 +188,8 @@ class AuthenticatedAdmissionRuntimeTests(unittest.TestCase):
                          ("CommandRejected","AuditLinked"))
 
     def test_adb_017_governance_denial_is_attributably_recorded(self):
-        command=fixture_command(); kernel,store,_,_,_=runtime(
-            command=command,evaluator=DenyEvaluator())
+        command=fixture_command(); admission=admission_for(command)
+        kernel,store,_,_,_=runtime(command=command,evaluator=DenyEvaluator())
         result=kernel.execute(command)
         self.assertEqual(tuple(event.event_type for event in result.recorded_events),
                          ("CommandRejected","AuditLinked"))
@@ -188,15 +197,38 @@ class AuthenticatedAdmissionRuntimeTests(unittest.TestCase):
         self.assertTrue(all(event.envelope.initiating_actor_id==ActorId("actor-runtime")
                             for event in result.recorded_events))
         self.assertEqual(store.append_calls,1)
+        self.assert_persisted_admission(result,admission)
 
     def test_adb_018_handler_denial_is_attributably_recorded(self):
-        command=fixture_command(); handler=RejectingHandler()
+        command=fixture_command(); admission=admission_for(command); handler=RejectingHandler()
         kernel,_,_,evaluator,_=runtime(command=command,handler=handler)
         result=kernel.execute(command)
         self.assertEqual(result.reason_code,ReasonCode.LIFECYCLE_INVALID_TRANSITION)
         self.assertEqual((evaluator.calls,handler.calls),(1,1))
         self.assertEqual(tuple(event.event_type for event in result.recorded_events),
                          ("CommandRejected","AuditLinked"))
+        self.assert_persisted_admission(result,admission)
+
+    def test_accepted_audit_persists_validated_admission_evidence(self):
+        command=fixture_command(); admission=admission_for(command)
+        kernel,_,_,_,_=runtime(command=command)
+        result=kernel.execute(command)
+        self.assertIsInstance(result,RuntimeAccepted)
+        self.assert_persisted_admission(result,admission)
+        evidence=result.audit_record.admission_evidence
+        self.assertEqual(evidence.organization_genesis_reference,
+                         IntegrityReference("genesis-runtime"))
+        self.assertEqual(evidence.actor_identity_reference,
+                         IntegrityReference("identity-runtime"))
+        self.assertEqual(evidence.invocation_proof_reference,
+                         IntegrityReference("proof-runtime"))
+        self.assertEqual(evidence.authentication_evidence_references,
+                         (IntegrityReference("authentication-runtime"),))
+        self.assertEqual(evidence.admission_mechanism_reference,
+                         IntegrityReference("fixture-resolver"))
+        self.assertEqual(evidence.admission_mechanism_version,VERSION)
+        with self.assertRaises(dataclasses.FrozenInstanceError):
+            evidence.admission_mechanism_reference=IntegrityReference("changed")
 
     def test_adb_019_recorded_rejection_redelivery_is_exact(self):
         command=fixture_command(); evaluator=DenyEvaluator()
@@ -207,6 +239,33 @@ class AuthenticatedAdmissionRuntimeTests(unittest.TestCase):
         self.assertEqual(tuple(ids.calls),allocations)
         self.assertEqual(store.append_calls,1)
         self.assertEqual(evaluator.calls,1)
+        self.assertIs(duplicate.audit_record.admission_evidence,
+                      original.audit_record.admission_evidence)
+
+    def test_exact_redelivery_cannot_replace_recorded_admission_evidence(self):
+        command=fixture_command()
+        original_admission=admission_for(command)
+        later_admission=dataclasses.replace(
+            original_admission,
+            authentication_evidence_references=(IntegrityReference("authentication-later"),),
+            admission_mechanism_reference=IntegrityReference("resolver-later"),
+        )
+        class ChangingResolver:
+            def __init__(self): self.calls=0
+            def resolve(self,claim):
+                self.calls+=1
+                return original_admission if self.calls == 1 else later_admission
+        resolver=ChangingResolver()
+        kernel,store,ids,_,_=runtime(command=command,resolver=resolver)
+        original=kernel.execute(command); allocations=tuple(ids.calls)
+        duplicate=kernel.execute(command)
+        self.assertIs(duplicate,original)
+        self.assertEqual(duplicate.audit_record.admission_evidence,
+                         AdmissionEvidenceSnapshot.from_established(original_admission))
+        self.assertNotEqual(duplicate.audit_record.admission_evidence,
+                            AdmissionEvidenceSnapshot.from_established(later_admission))
+        self.assertEqual((resolver.calls,store.append_calls),(2,1))
+        self.assertEqual(tuple(ids.calls),allocations)
 
     def test_adb_020_hostile_claim_creates_no_stream(self):
         command,_,kernel,store,_,_,_=self.denied_runtime()
@@ -268,10 +327,14 @@ class AuthenticatedAdmissionRuntimeTests(unittest.TestCase):
             admission_for(first),invocation_proof_reference=IntegrityReference("proof-changed")))
         resolver=DeterministicRecordingBoundaryResolver(proofs)
         kernel,store,_,_,_=runtime(command=first,resolver=resolver)
-        kernel.execute(first)
+        original=kernel.execute(first)
+        original_evidence=original.audit_record.admission_evidence
         result=kernel.execute(changed)
         self.assertEqual(result.reason_code,ReasonCode.IDEMPOTENCY_CONFLICT)
         self.assertEqual(len(store._streams[ORG]),3)
+        self.assertEqual(original.audit_record.admission_evidence,original_evidence)
+        self.assertEqual(store._streams[ORG][-1].payload["admission_evidence"],
+                         original_evidence)
 
     def test_malformed_resolver_output_fails_closed(self):
         class MalformedResolver:
@@ -281,6 +344,7 @@ class AuthenticatedAdmissionRuntimeTests(unittest.TestCase):
         kernel,store,ids,evaluator,handler=runtime(command=command,resolver=resolver)
         result=kernel.execute(command)
         self.assertEqual(result.reason_code,ReasonCode.GOVERNANCE_DEPENDENCY_UNAVAILABLE)
+        self.assertIsNone(result.audit_record)
         self.assert_no_authoritative_effect(store,ids,evaluator,handler)
 
     def test_substituted_admission_proof_fails_before_canonical_read(self):

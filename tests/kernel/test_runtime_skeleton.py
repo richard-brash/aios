@@ -153,6 +153,8 @@ class KernelRuntimeSkeletonTests(unittest.TestCase):
         self.assertEqual(store.read(ORG),result.recorded_events)
         self.assertEqual(tuple(event.envelope.stream_position for event in result.recorded_events),(1,2,3))
         self.assertEqual(result.recorded_events[-1].payload["facts"],result.audit_record.facts)
+        self.assertEqual(result.recorded_events[-1].payload["admission_evidence"],
+                         result.audit_record.admission_evidence)
         with self.assertRaises(dataclasses.FrozenInstanceError):
             result.recorded_events[1].event_type="Changed"
         with self.assertRaises(TypeError):

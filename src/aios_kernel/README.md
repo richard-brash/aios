@@ -79,7 +79,12 @@ must not perform kernel governance. Time and identifiers come from the existing
 `Clock` and `IdentifierAllocator` ports; the runtime contains no defaults or
 ambient service lookup. Handler registration is an explicit constructor value.
 Accepted and attributable rejected outcomes record their audit identity, outcome,
-and immutable facts in `AuditLinked`, so replay can reconstruct the audit trace.
+immutable facts, and a frozen snapshot of the validated admission proof in
+`AuditLinked`, so history retains the canonical Organization and Actor,
+invocation-proof binding, referenced authentication evidence, and admission
+mechanism identity and version without persisting provider internals or secret
+material. Pre-boundary rejection remains non-authoritative and has no audit
+record or admission-evidence snapshot.
 An append race returns before the builder runs and therefore cannot allocate IDs
 or overwrite accepted history.
 

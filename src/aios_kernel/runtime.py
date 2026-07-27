@@ -158,15 +158,69 @@ class AdmittedCommandContext:
 
 
 @dataclass(frozen=True, slots=True)
+class AdmissionEvidenceSnapshot:
+    """Immutable admission proof retained by authoritative ordinary audit."""
+
+    claim_message_id: MessageId
+    command_id: CommandId
+    organization_id: OrganizationId
+    initiating_actor_id: ActorId
+    organization_genesis_reference: IntegrityReference
+    actor_identity_reference: IntegrityReference
+    invocation_proof_reference: IntegrityReference
+    authentication_evidence_references: tuple[IntegrityReference, ...]
+    admission_mechanism_reference: IntegrityReference
+    admission_mechanism_version: RecordTypeVersion
+    schema_version: RecordTypeVersion
+
+    def __post_init__(self) -> None:
+        for name, expected in (
+            ("claim_message_id",MessageId),("command_id",CommandId),
+            ("organization_id",OrganizationId),("initiating_actor_id",ActorId),
+            ("organization_genesis_reference",IntegrityReference),
+            ("actor_identity_reference",IntegrityReference),
+            ("invocation_proof_reference",IntegrityReference),
+            ("admission_mechanism_reference",IntegrityReference),
+            ("admission_mechanism_version",RecordTypeVersion),
+            ("schema_version",RecordTypeVersion),
+        ):
+            if type(getattr(self,name)) is not expected:
+                raise TypeError(f"{name} must be {expected.__name__}")
+        evidence=tuple(self.authentication_evidence_references)
+        if not evidence or any(type(reference) is not IntegrityReference for reference in evidence):
+            raise ValueError("authentication evidence must contain immutable references")
+        object.__setattr__(
+            self,"authentication_evidence_references",evidence,
+        )
+
+    @classmethod
+    def from_established(cls, admission: AdmissionEstablished) -> "AdmissionEvidenceSnapshot":
+        if type(admission) is not AdmissionEstablished:
+            raise TypeError("audit admission evidence requires AdmissionEstablished")
+        return cls(
+            admission.claim_message_id,admission.command_id,
+            admission.organization_id,admission.initiating_actor_id,
+            admission.organization_genesis_reference,admission.actor_identity_reference,
+            admission.invocation_proof_reference,
+            admission.authentication_evidence_references,
+            admission.admission_mechanism_reference,
+            admission.admission_mechanism_version,admission.schema_version,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class RuntimeAuditRecord:
     audit_record_id: AuditRecordId
     organization_id: OrganizationId
     recording_command_id: CommandId
     evaluation_time: datetime
     outcome: str
+    admission_evidence: AdmissionEvidenceSnapshot
     facts: FrozenMap
 
     def __post_init__(self) -> None:
+        if type(self.admission_evidence) is not AdmissionEvidenceSnapshot:
+            raise TypeError("admission_evidence must be AdmissionEvidenceSnapshot")
         object.__setattr__(self,"facts",FrozenMap(self.facts))
 
 
@@ -413,11 +467,13 @@ class KernelRuntime:
                            proposals: tuple[DomainEventProposal, ...],
                            facts: FrozenMap) -> KernelRuntimeResult:
         organization_id=context.admission.organization_id
+        admission_evidence=AdmissionEvidenceSnapshot.from_established(context.admission)
         def build_batch():
             disposition_id=self._identifiers.disposition_id()
             audit_id=self._identifiers.audit_id()
             audit=RuntimeAuditRecord(audit_id,organization_id,
-                context.command.submission.command_id,context.evaluation_time,"accepted",facts)
+                context.command.submission.command_id,context.evaluation_time,"accepted",
+                admission_evidence,facts)
             all_proposals=(
                 DomainEventProposal("CommandAccepted",RECORD_V1,
                     FrozenMap({"operation_type":context.command.submission.operation_type,
@@ -425,6 +481,7 @@ class KernelRuntime:
                 *proposals,
                 DomainEventProposal("AuditLinked",RECORD_V1,
                     FrozenMap({"audit_record_id":str(audit_id),"outcome":audit.outcome,
+                               "admission_evidence":audit.admission_evidence,
                                "facts":audit.facts})),
             )
             events=self._materialize(context,audit_id,all_proposals)
@@ -453,22 +510,26 @@ class KernelRuntime:
         command=context.command
         evaluation_time=context.evaluation_time
         organization_id=context.admission.organization_id
+        admission_evidence=AdmissionEvidenceSnapshot.from_established(context.admission)
         def build_batch():
             disposition_id=self._identifiers.disposition_id()
             audit_id=self._identifiers.audit_id()
             audit=RuntimeAuditRecord(audit_id,organization_id,
-                command.submission.command_id,evaluation_time,"rejected",facts)
+                command.submission.command_id,evaluation_time,"rejected",
+                admission_evidence,facts)
             proposals=(
                 DomainEventProposal("CommandRejected",RECORD_V1,
                     FrozenMap({"failed_gate":gate,"reason_code":reason.value,
                                "disposition_id":str(disposition_id)})),
                 DomainEventProposal("AuditLinked",RECORD_V1,
                     FrozenMap({"audit_record_id":str(audit_id),"outcome":audit.outcome,
+                               "admission_evidence":audit.admission_evidence,
                                "facts":audit.facts})),
             )
             events=self._materialize(context,audit_id,proposals)
             audit=RuntimeAuditRecord(audit_id,organization_id,
-                command.submission.command_id,evaluation_time,"rejected",facts)
+                command.submission.command_id,evaluation_time,"rejected",
+                admission_evidence,facts)
             result=RuntimeRejected(reason,gate,detail,evaluation_time,
                 disposition_id,(),events,audit)
             return RuntimeAppendBatch(events,result)

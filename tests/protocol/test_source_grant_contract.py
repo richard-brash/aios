@@ -13,9 +13,11 @@ from aios_protocol.authority import (
     SourceAuthorityGrantProof,
     SourceAuthorityGrantResolution,
     SourceGrantResourceCeiling,
+    TaskResourceBound,
 )
+from aios_protocol.commands import ResourceDimension
 from aios_protocol.identifiers import (
-    ActorId, AuthorityGrantId, CapabilityId, CommandId, EventId,
+    ActorId, AuthorityGrantId, BudgetId, CapabilityId, CommandId, EventId,
     IntegrityReference, OrganizationId, ResourceId,
 )
 from aios_protocol.reason_codes import ReasonCode
@@ -27,6 +29,21 @@ T = datetime(2032, 1, 2, 3, 4, tzinfo=timezone.utc)
 def ceiling(limit: int = 1) -> SourceGrantResourceCeiling:
     return SourceGrantResourceCeiling(
         ResourceId("resource:delegated-execution"),
+        ResourceDimension.ACCEPTED_DELEGATED_CAPABILITY_EXECUTION,
+        ACCEPTED_DELEGATED_EXECUTION_UNIT,
+        limit,
+    )
+
+
+def task_bound(
+    limit: int = 1, *,
+    task_budget_id: BudgetId = BudgetId("budget:task-delegated-execution"),
+    source_resource_id: ResourceId = ResourceId("resource:delegated-execution"),
+) -> TaskResourceBound:
+    return TaskResourceBound(
+        task_budget_id,
+        source_resource_id,
+        ResourceDimension.ACCEPTED_DELEGATED_CAPABILITY_EXECUTION,
         ACCEPTED_DELEGATED_EXECUTION_UNIT,
         limit,
     )
@@ -41,7 +58,7 @@ def claim(**changes) -> SourceAuthorityGrantClaim:
         authorized_subject_actor_id=ActorId("actor:worker"),
         purpose="maintain-role-catalog",
         requested_capabilities=(CapabilityId("role.create"),),
-        requested_resource_ceiling=ceiling(),
+        requested_resource_ceiling=task_bound(),
         completion_condition="task:delegated-role:terminal",
         evaluation_time=T,
     )
@@ -105,19 +122,56 @@ class SourceAuthorityGrantContractTests(unittest.TestCase):
             ))
 
     def test_resource_ceiling_is_one_comparable_dimension(self):
-        self.assertTrue(ceiling(2).contains(ceiling(1)))
-        self.assertFalse(ceiling(1).contains(ceiling(2)))
+        self.assertTrue(ceiling(2).contains(task_bound(1)))
+        self.assertTrue(ceiling(2).contains(task_bound(2)))
+        self.assertFalse(ceiling(1).contains(task_bound(2)))
         with self.assertRaises(ValueError):
-            SourceGrantResourceCeiling(ResourceId("resource:x"), "tokens", 1)
+            SourceGrantResourceCeiling(
+                ResourceId("resource:x"), ResourceDimension.COMPUTE, "tokens", 1,
+            )
         with self.assertRaises(TypeError):
             SourceGrantResourceCeiling(
-                ResourceId("resource:x"), ACCEPTED_DELEGATED_EXECUTION_UNIT, 1.0,
+                ResourceId("resource:x"),
+                ResourceDimension.ACCEPTED_DELEGATED_CAPABILITY_EXECUTION,
+                ACCEPTED_DELEGATED_EXECUTION_UNIT, 1.0,
+            )
+
+    def test_task_budget_identity_is_distinct_from_source_resource_identity(self):
+        requested = task_bound(
+            task_budget_id=BudgetId("budget:task-specific"),
+            source_resource_id=ResourceId("resource:delegated-execution"),
+        )
+        self.assertIs(type(requested.task_budget_id), BudgetId)
+        self.assertIs(type(requested.source_resource_id), ResourceId)
+        self.assertNotEqual(str(requested.task_budget_id), str(requested.source_resource_id))
+        self.assertTrue(ceiling().contains(requested))
+
+    def test_resource_containment_requires_exact_dimension_unit_and_source_lineage(self):
+        self.assertFalse(ceiling().contains(task_bound(
+            source_resource_id=ResourceId("resource:unrelated"),
+        )))
+        with self.assertRaises(ValueError):
+            TaskResourceBound(
+                BudgetId("budget:task"), ResourceId("resource:delegated-execution"),
+                ResourceDimension.COMPUTE, "tokens", 1,
+            )
+        with self.assertRaises(ValueError):
+            TaskResourceBound(
+                BudgetId("budget:task"), ResourceId("resource:delegated-execution"),
+                ResourceDimension.ACCEPTED_DELEGATED_CAPABILITY_EXECUTION,
+                "another-unit", 1,
+            )
+        with self.assertRaises(ValueError):
+            TaskResourceBound(
+                BudgetId("budget:task"), None,
+                ResourceDimension.ACCEPTED_DELEGATED_CAPABILITY_EXECUTION,
+                ACCEPTED_DELEGATED_EXECUTION_UNIT, 1,
             )
 
     def test_resource_expansion_fails_closed(self):
         with self.assertRaises(ValueError):
             proof(resource_ceiling=ceiling(1)).validate_claim(
-                claim(requested_resource_ceiling=ceiling(2)),
+                claim(requested_resource_ceiling=task_bound(2)),
             )
 
     def test_organization_grantor_subject_and_grant_bind_exactly(self):
@@ -165,6 +219,17 @@ class SourceAuthorityGrantContractTests(unittest.TestCase):
             proof(evidence_references=())
         with self.assertRaises(ValueError):
             proof(evidence_references=(IntegrityReference("evidence:x"),) * 2)
+
+    def test_evidence_references_require_canonical_lexical_order(self):
+        canonical = (
+            IntegrityReference("evidence:grant"),
+            IntegrityReference("evidence:parent"),
+        )
+        self.assertEqual(proof(evidence_references=canonical).evidence_references, canonical)
+        with self.assertRaises(ValueError):
+            proof(evidence_references=tuple(reversed(canonical)))
+        rebuilt = tuple(sorted(set(reversed(canonical)), key=str))
+        self.assertEqual(proof(evidence_references=rebuilt), proof(evidence_references=canonical))
 
     def test_proof_and_claim_are_immutable(self):
         with self.assertRaises(dataclasses.FrozenInstanceError):

@@ -247,7 +247,7 @@ authorized subject Actor, exact purpose, exact finite capability request, one
 Resource ceiling, deterministic completion condition, evaluation time, and
 schema version. The successful proof binds those facts to an active source
 Grant; its parent Grant and delegation basis; exact permitted and prohibited
-capability sets; the Grant Resource ceiling; an affirmative delegation right;
+capability sets; the Grant source-Resource ceiling; an affirmative delegation right;
 the effective time and evaluated lifecycle state; Grant entity revision; and
 the authoritative Event, Organization-stream position, integrity, and evidence
 references from which the proof is derived.
@@ -256,10 +256,18 @@ Capability tuples MUST be nonempty where authority is requested, duplicate-free,
 lexically ordered, and composed only of exact `CapabilityId` values. Wildcards,
 namespace patterns, and implicit capability discovery are invalid. Requested
 capabilities MUST be a subset of the permitted set and disjoint from the
-prohibited set. The sole Milestone 3 Resource dimension is
-`accepted_delegated_capability_execution`; containment requires the same
-`ResourceId` and unit and a positive requested integer limit no greater than the
-source Grant limit. The proof carries no consumption state.
+prohibited set. `SourceGrantResourceCeiling` identifies the authoritative
+source Grant `ResourceId`, canonical `ResourceDimension`, unit, and positive
+authorized limit. `TaskResourceBound` separately identifies the Task-scoped
+`BudgetId`, retains the exact source `ResourceId` as lineage, and supplies its
+dimension, unit, and positive requested limit. The Budget and Resource
+identifiers are distinct types and need not have equal text. The sole
+Milestone 3 Resource dimension and unit are
+`accepted_delegated_capability_execution`; containment requires exact source
+lineage, equal canonical dimension and unit, and a requested limit no greater
+than the source limit. An unrelated source Resource, incompatible dimension or
+unit, missing lineage, or wider limit fails closed. The proof carries no
+consumption state.
 
 Constitutional purpose is descriptive rather than a policy language. Therefore
 this contract permits only exact normalized purpose equality; it does not infer
@@ -277,6 +285,10 @@ exact capability containment; Resource containment; then complete downstream
 Task attenuation. Failure uses the existing stable `INPUT.*`, `VER.*`,
 `ORG.*`, `AUTH.*`, `RESOURCE.*`, `GOVERNANCE.*`, or `INTEGRITY.*` reasons in a
 typed `SourceAuthorityGrantDenied`; no new reason family is introduced.
+
+`evidence_references` is a nonempty, duplicate-free tuple in ascending lexical
+order of the canonical `IntegrityReference` string. Noncanonical order is
+malformed; insertion order is not semantic state.
 
 An accepted execution records the exact proof and evidence lineage used at its
 decision point. Replay validates that immutable recorded proof and MUST NOT call

@@ -7,8 +7,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Protocol
 
+from .commands import ResourceDimension
 from .identifiers import (
-    ActorId, AuthorityGrantId, CapabilityId, CommandId, EventId,
+    ActorId, AuthorityGrantId, BudgetId, CapabilityId, CommandId, EventId,
     IntegrityReference, OrganizationId, ResourceId,
 )
 from .reason_codes import ReasonCode
@@ -57,28 +58,75 @@ def _exact_capabilities(
 
 @dataclass(frozen=True, slots=True)
 class SourceGrantResourceCeiling:
-    """One comparable immutable Grant Resource bound; no consumption state."""
+    """One immutable source-Grant Resource bound; no Task Budget identity."""
 
-    resource_id: ResourceId
+    source_resource_id: ResourceId
+    resource_dimension: ResourceDimension
     unit: str
     authorized_limit: int
 
     def __post_init__(self) -> None:
-        require_type(self.resource_id, ResourceId, type(self).__name__, "resource_id")
+        require_type(
+            self.source_resource_id, ResourceId, type(self).__name__,
+            "source_resource_id",
+        )
+        require_type(
+            self.resource_dimension, ResourceDimension, type(self).__name__,
+            "resource_dimension",
+        )
         require_nonempty(self.unit, type(self).__name__, "unit")
         require_positive(self.authorized_limit, type(self).__name__, "authorized_limit")
         if type(self.authorized_limit) is not int:
             raise TypeError("authorized_limit must be int")
-        if self.unit != ACCEPTED_DELEGATED_EXECUTION_UNIT:
+        if (
+            self.resource_dimension
+            is not ResourceDimension.ACCEPTED_DELEGATED_CAPABILITY_EXECUTION
+            or self.unit != ACCEPTED_DELEGATED_EXECUTION_UNIT
+        ):
             raise ValueError("source Grant Resource unit is unsupported")
 
-    def contains(self, requested: "SourceGrantResourceCeiling") -> bool:
-        require_type(requested, SourceGrantResourceCeiling, type(self).__name__, "requested")
+    def contains(self, requested: "TaskResourceBound") -> bool:
+        """Compare dimension and limit while requiring exact source lineage."""
+
+        require_type(requested, TaskResourceBound, type(self).__name__, "requested")
         return (
-            self.resource_id == requested.resource_id
+            self.source_resource_id == requested.source_resource_id
+            and self.resource_dimension == requested.resource_dimension
             and self.unit == requested.unit
-            and requested.authorized_limit <= self.authorized_limit
+            and requested.requested_limit <= self.authorized_limit
         )
+
+
+@dataclass(frozen=True, slots=True)
+class TaskResourceBound:
+    """Task Budget identity and exact attenuated source-Resource lineage."""
+
+    task_budget_id: BudgetId
+    source_resource_id: ResourceId
+    resource_dimension: ResourceDimension
+    unit: str
+    requested_limit: int
+
+    def __post_init__(self) -> None:
+        require_type(self.task_budget_id, BudgetId, type(self).__name__, "task_budget_id")
+        require_type(
+            self.source_resource_id, ResourceId, type(self).__name__,
+            "source_resource_id",
+        )
+        require_type(
+            self.resource_dimension, ResourceDimension, type(self).__name__,
+            "resource_dimension",
+        )
+        require_nonempty(self.unit, type(self).__name__, "unit")
+        require_positive(self.requested_limit, type(self).__name__, "requested_limit")
+        if type(self.requested_limit) is not int:
+            raise TypeError("requested_limit must be int")
+        if (
+            self.resource_dimension
+            is not ResourceDimension.ACCEPTED_DELEGATED_CAPABILITY_EXECUTION
+            or self.unit != ACCEPTED_DELEGATED_EXECUTION_UNIT
+        ):
+            raise ValueError("Task Resource dimension or unit is unsupported")
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,7 +140,7 @@ class SourceAuthorityGrantClaim:
     authorized_subject_actor_id: ActorId
     purpose: str
     requested_capabilities: tuple[CapabilityId, ...]
-    requested_resource_ceiling: SourceGrantResourceCeiling
+    requested_resource_ceiling: TaskResourceBound
     completion_condition: str
     evaluation_time: datetime
     schema_version: RecordTypeVersion = RECORD_V1
@@ -104,7 +152,7 @@ class SourceAuthorityGrantClaim:
             ("authority_grant_id", AuthorityGrantId),
             ("grantor_actor_id", ActorId),
             ("authorized_subject_actor_id", ActorId),
-            ("requested_resource_ceiling", SourceGrantResourceCeiling),
+            ("requested_resource_ceiling", TaskResourceBound),
             ("schema_version", RecordTypeVersion),
         ):
             require_type(getattr(self, name), expected, type(self).__name__, name)
@@ -202,6 +250,8 @@ class SourceAuthorityGrantProof:
             )
         if len(set(evidence)) != len(evidence):
             raise ValueError("source Authority Grant evidence must not contain duplicates")
+        if evidence != tuple(sorted(evidence, key=str)):
+            raise ValueError("source Authority Grant evidence must use canonical lexical ordering")
         object.__setattr__(self, "evidence_references", evidence)
 
     def validate_claim(self, claim: SourceAuthorityGrantClaim) -> None:

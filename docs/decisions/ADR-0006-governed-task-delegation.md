@@ -77,9 +77,14 @@ one immutable Task-scoped Budget dimension whose unit is
 This satisfies the existing `budget_ids` contract without requiring a general
 budget administration or metering subsystem.
 
-The source Grant must express the same Resource unit with a limit of at least
-one and enumerate exact `capability_id` values in its permitted actions.
-Otherwise deterministic attenuation is incomparable and fails closed.
+The source Grant ceiling identifies its authoritative Resource record. The
+Task Budget has its own `budget_id` and retains an explicit reference to that
+source Resource; it does not reuse the Resource identity as its Budget
+identity. Attenuation requires the same canonical Resource dimension and unit,
+that exact source-Resource lineage, and a Task limit no greater than the source
+limit. The source Grant must also enumerate exact `capability_id` values in its
+permitted actions. Otherwise deterministic attenuation is incomparable and
+fails closed.
 
 This is deterministic, replayable, attributable to the enrollment and source
 Grant, and prevents unbounded accepted execution without monetary, token,

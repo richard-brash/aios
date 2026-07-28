@@ -60,7 +60,9 @@ Milestone 3 source-Grant attenuation starts with the immutable contracts in
 trusted boundary to prove one exact, Organization-bound use; a
 `SourceAuthorityGrantProof` binds that use to active authoritative Grant
 evidence, exact finite capabilities, affirmative delegation, and one comparable
-Resource ceiling. These records neither administer Grants nor authorize or
+source-Resource ceiling. A distinct `TaskResourceBound` identifies the Task
+Budget while retaining exact source-Resource, dimension, and unit lineage.
+These records neither administer Grants nor authorize or
 execute a capability. Historical replay validates the recorded proof without
 calling its resolver or consulting mutable current state.
 

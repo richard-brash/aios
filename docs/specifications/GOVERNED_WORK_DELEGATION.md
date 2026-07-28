@@ -49,7 +49,8 @@ a new entity. Its accepted evidence MUST establish:
 - one `source_authority_grant_id` whose recipient is the Actor;
 - one `task_id` after issuance;
 - exact capability and Tool bounds no wider than the Grant;
-- one immutable Task-scoped Budget reference with unit
+- one immutable Task-scoped Budget reference with its own `budget_id`, exact
+  source-Grant Resource lineage, and Resource dimension and unit
   `accepted_delegated_capability_execution`, authorized limit one, and
   `maximum_accepted_capability_executions=1`;
 - terminality of that Task as its completion condition;
@@ -109,7 +110,8 @@ The Milestone 3 Task is the existing Task with these pinned facts at acceptance:
   wildcard, namespace, pattern, or discovery expression;
 - immutable input or governed input reference and integrity identifier;
 - purpose, expected output, acceptance criteria, risk, and reversibility;
-- one immutable `budget_id` using unit
+- one immutable `budget_id` referencing the source Grant Resource and using
+  Resource dimension and unit
   `accepted_delegated_capability_execution`, authorized limit one, and
   `maximum_accepted_capability_executions=1`, initially unconsumed;
 - redelegation prohibited;
@@ -146,7 +148,7 @@ be comparable and the Task equal or narrower:
 | Issuer | Task issuer equals the Sponsor and source Grant issuer, is eligible under the parent Grant chain, and has the delegation right |
 | Purpose | Task purpose is within Grant purpose; ambiguity denies |
 | Capability | For this profile the Grant's permitted actions enumerate exact `capability_id` values; every Task capability is present and not prohibited |
-| Resource | Grant limits include the same `accepted_delegated_capability_execution` unit with limit at least one; Task limit remains exactly one and affected Resources fit Grant scope |
+| Resource | Grant evidence names one source Resource with dimension and unit `accepted_delegated_capability_execution` and limit at least one; the independently identified Task Budget retains that source lineage, uses the same dimension and unit, and has limit exactly one |
 | Risk/approval | Task risk is no higher and preserves every approval condition |
 | Duration | Task completion condition is no later than Grant applicability |
 | Delegation | Task prohibits redelegation and sub-worker creation |
@@ -163,9 +165,11 @@ The minimum executable prerequisite is the capability-neutral immutable
 closed `SourceAuthorityGrantDenied` result. It binds one Command and canonical
 Organization to Grant identity, versioned Event evidence, issuer, recipient,
 exact purpose, exact permitted and prohibited capabilities, one comparable
-Resource ceiling, deterministic completion condition, affirmative delegation
-basis, evaluated effective lifecycle state, and authoritative revision and
-stream position. Purpose containment is exact normalized equality because the
+source-Resource ceiling, an independently identified Task Budget bound that
+retains the source Resource lineage, deterministic completion condition,
+affirmative delegation basis, evaluated effective lifecycle state, and
+authoritative revision and stream position. Purpose containment is exact
+normalized equality because the
 constitutional purpose is descriptive; no semantic inference or policy
 language is introduced. It MUST NOT create, update, revoke, infer, or broaden
 Grants. Risk and approval conditions remain independently mandatory governance

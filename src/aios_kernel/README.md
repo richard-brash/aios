@@ -98,6 +98,60 @@ under `reference/` is deterministic test support only.
 
 This skeleton deliberately defers complete governance implementations,
 production persistence, projection catalogs, domain
-capabilities, bootstrap, scheduling, subscriptions, Tools, memory retrieval,
+capabilities, scheduling, subscriptions, Tools, memory retrieval,
 networking, agents, and models. It is a foundation for those separately governed
 increments, not a claim of full kernel conformance.
+
+## Constitutional bootstrap runtime
+
+`aios_kernel.bootstrap_runtime` is a separate pre-Organization path; it does not
+register a handler in the ordinary Organization-scoped `KernelRuntime`. Its
+fixed sequence is:
+
+1. reject non-`BootstrapRequest` input before constitutional evaluation;
+2. bind one timezone-aware evaluation time from the injected Clock;
+3. validate protocol, schema, reserved-genesis, direct-Constitution, founding
+   Human, Role Assignment, duty, Organization attributes, initial Grants, and
+   semantic Event coverage;
+4. preserve the request as a `BootstrapProposal` and produce a typed accepted or
+   rejected constitutional Decision;
+5. compare the complete candidate against any registered attempt;
+6. for a new accepted candidate on an empty stream, invoke deferred Event
+   materialization through the injected identifier allocator;
+7. atomically publish the entire ordered founding Event set and exact-redelivery
+   registration, or publish neither;
+8. reconstruct `FoundedOrganizationState` solely from the recorded Events.
+
+The reference stream identity is deterministically derived from the proposed
+Organization identifier. Exact request redelivery returns the original committed
+outcome and allocates or appends nothing. A material difference is a competing
+genesis and fails closed. Precommit uncertainty quarantines the identity using
+internal reconciliation metadata without publishing founding Events.
+
+The proposed Event type strings form a non-normative reference vocabulary.
+Runtime acceptance depends on `FoundingEventCoverage` and matching immutable
+payload facts, not those names. This permits different conforming vocabularies
+and Event granularity without weakening founding completeness.
+
+`replay_genesis` validates ordered, single-genesis history and reconstructs the
+Organization, verified Human, Constitution, Mission, jurisdiction, retention
+Policy, founding Role and Assignment, founding Decision and duty, initial
+Grants, audit identity, recording Command, request integrity, and completion.
+Replay obtains no time or identifiers and invokes neither evaluation nor
+recording.
+
+Every committed founding Event also carries the same immutable
+`CommittedGenesisEvidence`: supported protocol versions, direct-Constitution
+basis, exhausted genesis exception, request/proposal/Decision integrity
+references, reserved recording Command, semantic coverage, and per-Event
+declarations. The atomic reference store runs `replay_genesis` against the
+candidate batch before publication. Command-time acceptance and replay therefore
+enforce the same history-owned constitutional relationships without consulting
+the submitted request, evaluator, exact-redelivery registration, or mutable
+store state. Concrete reference Event names remain non-normative; the recorded
+declarations and semantic coverage bind the vocabulary used by that history.
+
+This slice still does not provide production identity verification, general
+governance or Policy infrastructure, production persistence, distributed
+consensus, reconciliation execution, or any ordinary post-genesis Organization
+capability.

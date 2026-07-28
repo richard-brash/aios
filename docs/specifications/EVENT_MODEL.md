@@ -144,6 +144,7 @@ Each Event has exactly one primary category and MAY have secondary classificatio
 The following names have fixed minimum meanings. Implementations MAY add narrower event types but MUST NOT reuse these names incompatibly.
 
 - `EmployeeCreated`: a deterministic Event that establishes a persistent Employee identity in exactly one Organization; it does not activate employment or grant authority, and its confidence is not applicable.
+- `RoleActivated`: a deterministic ordinary post-genesis transition Event that changes exactly one existing Role from `draft` at revision `n` to `active` at revision `n + 1`. Its versioned payload contains `role_id`, `prior_lifecycle_state=draft`, `lifecycle_state=active`, `prior_entity_revision=n`, and `entity_revision=n + 1`. It creates no Role Assignment or Authority Grant and is appended only to the authoritative Organization stream.
 - `TaskAssigned`: changes an eligible Task to `assigned` and identifies one eligible assignee; it does not expand task scope or authority.
 - `GoalCompleted`: a deterministic transition Event recording that current success criteria were evaluated against pinned evidence and satisfied through an authorized completion Decision; confidence belongs to uncertain evidence Events, not this transition fact.
 - `AuthorityGranted`: activates a valid Grant after all required approvals; its payload contains the complete effective scope and constraints.

@@ -50,12 +50,17 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
     [*] --> Draft: RoleCreated (ordinary post-genesis)
+    Draft --> Active: RoleActivated
 ```
 
 - `[nonexistent] -> draft` is the sole legal initial transition for an ordinarily created post-genesis Role.
-- Ordinary Role creation MUST NOT transition directly to `active`. Activation is a separate governed action and requires an explicitly admitted transition; this section does not authorize or define its future preconditions.
+- Ordinary Role creation MUST NOT transition directly to `active`.
+- `draft -> active` is an **Authorized** transition performed only by the ordinary `ActivateRole` operation defined in [`KERNEL_PROTOCOL.md`](KERNEL_PROTOCOL.md). It requires completed Organization genesis; an explicit current Authority Grant whose action scope includes `role.activate` for the exact Role and Organization; current Policy clearance; separation-of-duties validation; exact `draft` state; matching Role `entity_revision`; and matching expected Organization stream position. Role identity, Role eligibility, the Role being activated, a future Role Assignment, or possession of credentials cannot supply this authority.
+- A Decision or Approval is not intrinsic to Role activation because an active Role still grants no authority by itself. The kernel MUST nevertheless require and validate a Decision or Approval when the Constitution, current Policy, risk classification, separation-of-duties rule, or the controlling Grant independently requires one. Those governance references remain in the ordinary Command envelope and audit linkage, not the domain payload.
+- The activating Actor is an independently authorized Actor and is never “the Role.” Activation creates no Role Assignment and does not permit the target Role, its name, or a prospective occupant to authorize the transition.
+- A new Command targeting an already-active Role is rejected with `LIFECYCLE.INVALID_TRANSITION`; it is not a semantic no-op. Exact redelivery of the original accepted Command remains governed by Command idempotency and returns the original disposition without another transition Event.
 - Every other unspecified Role transition remains rejected under the common transition rule.
-- The constitutional owner or governor Role established within the atomic bootstrap transaction is a distinct reserved genesis establishment. It is not an ordinary `RoleCreated` transition and MUST NOT be recreated after genesis.
+- The constitutional owner or governor Role established active within the atomic bootstrap transaction is a distinct reserved genesis establishment. It is not an ordinary `RoleCreated` or `RoleActivated` transition and MUST NOT be recreated or reactivated after genesis. An ordinary `ActivateRole` Command targeting its stable genesis-derived identity follows the general already-active rejection rule.
 
 ## 4. Employee
 

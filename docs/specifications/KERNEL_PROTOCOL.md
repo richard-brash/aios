@@ -176,9 +176,26 @@ Historical Events and replay use the schema, Policy, transition rules, and speci
 | `stop_conditions` | Budget, time, Incident, safety, evidence, and external conditions |
 | `tool_request` | Tool, operation, exact bounded inputs/protected references, and result contract when applicable |
 
+### 5.1 ActivateRole subtype
+
+The sole ordinary Role activation operation has `operation_type=ActivateRole`, `operation_version=1.0`, `payload_type=ActivateRolePayload`, and `payload_version=1.0`. Its typed payload contains exactly:
+
+- `role_id`: the stable `RoleId` of the target Role; and
+- `expected_entity_revision`: a positive integer naming the exact Role projection revision expected by the caller.
+
+No lifecycle reason, requested state, Organization identity, Actor identity, timestamp, authority assertion, Decision, Approval, idempotency key, or Organization stream position is duplicated in this payload. The requested transition is fixed by the operation contract.
+
+`target_references` MUST contain exactly one `EntityReference` with `entity_type=Role`, the same `role_id`, and `expected_version` equal to `expected_entity_revision`. `lifecycle_preconditions` MUST declare `current_state=draft` and `requested_state=active`. The ordinary Command envelope supplies exactly one `organization_id`, initiating Actor, asserted Authority references, and idempotency key; the ordinary runtime Command context supplies the expected Organization stream position. A mismatched payload, target, lifecycle precondition, or revision is malformed.
+
+The authenticated admission boundary MUST first prove completed genesis and exact Organization and initiating-Actor attribution. After that proof, the Role domain precondition MUST establish an existing Role in `draft` and a matching Role revision from the same bound Organization history used for append. Governance MUST require at least one asserted Grant reference and validate current authority whose action scope includes `role.activate` for the exact Role and Organization. Role activation is Authorized: it has no intrinsic Decision or Approval requirement, but every Decision, Approval, Policy, risk, or separation-of-duties condition independently applicable under higher rules remains mandatory. Governance evaluation remains outside the Role domain transition.
+
+ActivateRole rejection uses the existing stable reason registry: malformed payload, target, or lifecycle precondition uses `INPUT.MALFORMED`; unsupported operation, record, or payload version uses `VER.UNSUPPORTED`; Organization mismatch uses `ORG.BOUNDARY_VIOLATION`; missing, insufficient, invalid, or unavailable governance uses the applicable `AUTH.*`, `POLICY.*`, `DECISION.*`, `APPROVAL.*`, or `GOVERNANCE.DEPENDENCY_UNAVAILABLE` code; a nonexistent Role or any source state other than `draft`, including the already-active founding Role, uses `LIFECYCLE.INVALID_TRANSITION`; mismatched Role revision uses `STATE.STALE_VERSION`; stale Organization position uses `STREAM.CONCURRENCY_CONFLICT`; and conflicting idempotency reuse uses `IDEMPOTENCY.CONFLICT`. Protocol validation precedes governance, governance precedes domain transition evaluation, and none of these failures emits `RoleActivated`.
+
+Exact redelivery uses the existing `(organization_id, initiating_actor_id, operation_family, idempotency_key)` scope bound to complete material Command semantics. It returns the original disposition, identifiers, positions, and evaluation time and appends no new Event. A new Command for an already-active Role is not exact redelivery and receives the lifecycle rejection above. The expected Organization stream position remains the authoritative append precondition; `expected_entity_revision` is an additional domain precondition and cannot authorize a write against a stale Organization position.
+
 The caller may assert references only. The kernel resolves Organization, identity, Role, Grants, Policies, Work Root, Decision, Approvals, Resources, lifecycle, evidence access, and current versions. It MUST reject rather than replace an invalid assertion with a broader or different one.
 
-### 5.1 Authenticated recording-boundary contract
+### 5.2 Authenticated recording-boundary contract
 
 `RecordingBoundaryResolver` is the capability-neutral trusted admission port for ordinary post-genesis Commands. It performs no authorization and has no Organization Event-store, idempotency, audit, handler, or append capability. It accepts one immutable `AdmissionClaim` containing exactly:
 
@@ -233,6 +250,8 @@ Event-type schemas classify Resource references, supporting Evidence, result, ep
 
 Consequential Decision and Action Event schemas require `GovernanceRoleAttribution` sufficient to preserve the distinct initiating, participating, proposing/recommending, accountable-deciding, approving, and technical-recording roles, including the full Governing Body disposition reference when applicable.
 
+`RoleActivated` has Event `schema_version=1.0` and payload version `1.0`. Its payload contains exactly `role_id`, `prior_lifecycle_state=draft`, `lifecycle_state=active`, `prior_entity_revision`, and `entity_revision`, where the resulting revision equals the positive prior revision plus exactly one. The Event envelope supplies Organization, initiating Actor, recording Command, correlation, evaluation time, authoritative Organization `stream_id` and `stream_position`, classification, integrity, and audit linkage; its causal Command reference MUST equal that recording Command. Applicable Authority, Policy, Decision, Approval, and authenticated-admission evidence remains in governed envelope/audit references and MUST NOT be copied into the domain payload. The Event identifies the resulting Role revision in its entity reference and creates no Assignment, Grant, or other Role fact.
+
 The Event `timestamp` is the kernel-recorded acceptance/occurrence-in-AIOS time and controls authoritative ordering only through its assigned stream position. A real-world `occurred_at`, `observed_at`, adapter time, or external-system time is a payload observation with source and uncertainty; it never replaces `timestamp`, `evaluation_time`, or `stream_position`.
 
 When applicable, `epistemic_status` is one of `deterministic`, `observed`, `asserted`, `inferred`, `predicted`, or `disputed`. Confidence is omitted or explicitly not applicable for deterministic transition facts as selected by schema and required for inferred, predicted, uncertain observed, and disputed assertions. Confidence never creates authority or truth.
@@ -274,6 +293,16 @@ Storage uncertainty MUST NOT be represented as success or confirmed nonappend. R
 A response is not authoritative independently of its validated source history. External domain content is referenced, not fabricated or claimed reconstructed.
 
 Entity projections, including Role projections and filtered Event views, MUST be reproducible from the authoritative Organization stream. They MAY support entity-focused navigation and validation but MUST NOT expose or imply a separate authoritative per-entity Event history.
+
+Role projection replay MUST validate every Organization Event envelope, supported type and version, payload contract, identity, stream, contiguous position, integrity, and disposition/audit lineage before advancing the projection. Unknown Event types, unsupported versions, malformed Events, and inconsistent history fail closed without returning a partially advanced authoritative projection. A recognized non-Role Event may be traversed only after that common validation.
+
+`RoleActivated` is authoritative only within one complete ordered `CommandAccepted(ActivateRole v1) -> RoleActivated -> AuditLinked` sequence. The acceptance MUST identify the supported ActivateRole operation and version. All three Events MUST retain the same Organization, initiating Actor, recording Command, correlation, evaluation time, and audit identity; the activation causal Command reference MUST equal the recording Command and the activation MUST identify the same stable Role and its exact prior state and revision. `AuditLinked` MUST contain the immutable authenticated-admission evidence snapshot and that snapshot MUST bind the same canonical Organization, initiating Actor, and recording Command as the complete accepted sequence. An orphan activation, acceptance for another operation or version, mismatched Organization, Actor, recording Command, correlation, audit identity, or admission evidence, duplicated activation under one acceptance, incomplete sequence, or inconsistent audit link is corrupt history and MUST fail replay closed. This is the activation counterpart of the accepted CreateRole lineage already required for `RoleCreated`; neither domain Event is self-authorizing.
+
+Role replay consumes the complete canonical Organization history, not a filtered Role-only history. Complete recognized accepted CreateTask transactions, accepted CreateRole transactions, and attributable rejection transactions MAY appear before, between, or after activation transactions; replay MUST validate their supported canonical disposition, domain, and audit lineage and traverse them without changing Role state. Pre-boundary rejections are non-authoritative and cannot appear in that history. Unknown, unsupported, malformed, or causally inconsistent Events are never projection-neutral and MUST fail replay closed.
+
+When folding a valid `RoleActivated` sequence, replay MUST locate the Role by stable `role_id`, require the same Organization, current state `draft`, exact `prior_entity_revision`, and `entity_revision=prior_entity_revision+1`, then change only lifecycle state and entity revision. It MUST reject an activation for a nonexistent Role; an active, suspended, retired, archived, or otherwise non-draft Role; a mismatched prior or resulting revision; a duplicate or contradictory activation; or a mismatched Organization, stream, schema, payload version, or Event order. Replay performs no governance, Command handling, allocation, clock access, append, persistence mutation, or external effect.
+
+An ordinary `ActivateRole` Command targeting the genesis-derived founding Role encounters the same already-active lifecycle rejection as any other active Role. Genesis history remains authoritative and MUST NOT be reinterpreted as an ordinary activation.
 
 Canonical relationship protocol is implemented within PF-05 Projection and PF-16 Audit rather than as a new top-level family:
 
@@ -579,7 +608,7 @@ The receiver MUST enforce:
 
 ## 24. Conformance traceability
 
-This matrix maps all 20 protocol families to the final 260 mandatory scenarios across 19 suites in `KERNEL_CONFORMANCE.md`; it does not duplicate their definitions. The authenticated recording-boundary contract is part of PF-01 Command and PF-02 disposition. PF-05 and PF-16 implement the canonical relationship records and PF-03 supplies their accepted Event history, together covering REL.
+This matrix maps all 20 protocol families to the final 277 mandatory scenarios across 19 suites in `KERNEL_CONFORMANCE.md`; it does not duplicate their definitions. The authenticated recording-boundary contract is part of PF-01 Command and PF-02 disposition. PF-05 and PF-16 implement the canonical relationship records and PF-03 supplies their accepted Event history, together covering REL.
 
 | Families | Primary conformance suites |
 |---|---|

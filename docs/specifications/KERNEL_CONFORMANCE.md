@@ -16,7 +16,7 @@ This specification is governed by [`ARCHITECTURE_PRINCIPLES.md`](ARCHITECTURE_PR
 - **Implementation under test (IUT):** the complete kernel boundary being evaluated, including any specialized services to which it delegates normative mechanics.
 - **Test harness:** an external observer and fault controller that submits inputs, supplies controlled adapter and external-system behavior, captures outputs, and MUST NOT confer authority.
 - **Canonical fixture:** a versioned, reusable set of stable entities, Events, projections, Policies, and controlled external observations defined by this specification.
-- **Mandatory scenario:** a test whose identifier appears in Sections 12–28, Section 13.1, or the adversarial matrix. Every mandatory scenario MUST pass unless its requirement is formally inapplicable to a constitutionally valid implementation; the conformance report MUST justify and independently approve any inapplicability. The suite contains 260 catalog identifiers; a parameterized row may require multiple executions without changing that catalog count.
+- **Mandatory scenario:** a test whose identifier appears in Sections 12–28, Section 13.1, or the adversarial matrix. Every mandatory scenario MUST pass unless its requirement is formally inapplicable to a constitutionally valid implementation; the conformance report MUST justify and independently approve any inapplicability. The suite contains 277 catalog identifiers; a parameterized row may require multiple executions without changing that catalog count.
 - **Disposition:** `accepted`, `rejected`, `previously_admitted`, `paused`, or `escalated` as defined by the kernel admission output contract.
 - **Safe failure:** no unauthorized transition, disclosure, Tool dispatch, Resource or Approval mutation, success assertion, or replay effect; an attributable rejection, pause, suspension, reconciliation, Incident, or escalation is recorded where a valid recording boundary exists.
 - **Exact semantic equality:** equality of every normative field and meaning after canonical normalization, regardless of serialization syntax or field order.
@@ -179,7 +179,7 @@ Every rejection and injected failure MUST prove the absence of unauthorized targ
 
 ## 10. Minimum conformance test matrix
 
-The minimum suite contains 260 mandatory scenarios. Every scenario MUST be instantiated using the normative test-case format in Section 4.5.
+The minimum suite contains 277 mandatory scenarios. Every scenario MUST be instantiated using the normative test-case format in Section 4.5.
 
 | Suite | Identifier range | Mandatory scenarios | Primary contract |
 |---|---|---:|---|
@@ -191,7 +191,7 @@ The minimum suite contains 260 mandatory scenarios. Every scenario MUST be insta
 | Work Root | `WRT-001`–`WRT-010` | 10 | Exclusive Goal-or-duty traceability with optional planning structures |
 | Approval | `APR-001`–`APR-014` | 14 | Mode, atomic usage, separation from Authority, and concurrency |
 | Resource governance | `RES-001`–`RES-012` | 12 | Pre-dispatch reservation, aggregation, independent dimensions, and reconciliation |
-| Lifecycle | `LIF-001`–`LIF-015` | 15 | Legal transitions, Role creation, dependencies, evidence, suspension, and durable identity |
+| Lifecycle | `LIF-001`–`LIF-032` | 32 | Legal transitions, Role creation and activation, dependencies, evidence, suspension, and durable identity |
 | Scheduling and orchestration | `SCH-001`–`SCH-015` | 15 | Governed schedule admission and trigger enforcement without scheduling strategy |
 | Tool and reconciliation | `TOL-001`–`TOL-012` | 12 | Authorization/attempt/result separation and adapter containment |
 | Event ordering and idempotency | `EVT-001`–`EVT-014` | 14 | Immutability, Organization-wide order, entity projection, causal provenance, and epistemic validity |
@@ -202,7 +202,7 @@ The minimum suite contains 260 mandatory scenarios. Every scenario MUST be insta
 | Audit and Decisions | `AUD-001`–`AUD-015` | 15 | Complete consequential trace, Decision-state revalidation, and collective attribution |
 | Replay and recovery | `RPL-001`–`RPL-015` | 15 | Projection equivalence, governed availability, history integrity, and zero effects |
 | Portability and model replacement | `POR-001`–`POR-008` | 8 | Institutional continuity across environments and replaceable models |
-| **Total** |  | **260** | All scenarios are independently mandatory |
+| **Total** |  | **277** | All scenarios are independently mandatory |
 
 ## 11. Adversarial and fault-injection matrix
 
@@ -392,6 +392,23 @@ This suite proves the ordinary post-genesis boundary between effect-free input h
 | LIF-013 | Ordinarily create a post-genesis Role | Append a Role creation Event whose resulting Role state is exactly `draft` |
 | LIF-014 | Ordinary Role creation requests initial state `active` | Reject illegal transition; create no Role and append no Role lifecycle Event |
 | LIF-015 | Replay genesis containing the constitutional owner or governor Role | Preserve the founding Role under reserved bootstrap semantics; do not reinterpret it as or require an ordinary `[nonexistent] -> draft` creation |
+| LIF-016 | Authorized `ActivateRole` v1 targets an existing draft Role at the exact expected Role revision and Organization position | Accept and emit exactly one `RoleActivated` domain Event; kernel disposition and audit Events remain separate |
+| LIF-017 | Accepted Role activation is inspected in the authoritative stream | Append `RoleActivated` only to `organization:<organization_id>` at the next Organization-wide position; create no Role stream |
+| LIF-018 | Apply valid `RoleActivated` with prior state `draft` and prior revision `n` | Project `active` at revision `n + 1`; change no other Role fact |
+| LIF-019 | Replay genesis, `RoleCreated`, and `RoleActivated` in Organization order | Reconstruct the same active Role and revision deterministically with no governance, handler, clock, allocation, append, persistence mutation, or external effect |
+| LIF-020 | `ActivateRole` targets a nonexistent Role identity | Reject `LIFECYCLE.INVALID_TRANSITION`; append no `RoleActivated` |
+| LIF-021 | A new Command targets an already-active Role | Reject `LIFECYCLE.INVALID_TRANSITION`; do not treat it as a no-op or exact redelivery |
+| LIF-022 | `ActivateRole` targets a suspended, retired, archived, or otherwise non-draft Role | Reject `LIFECYCLE.INVALID_TRANSITION`; preserve state and revision |
+| LIF-023 | Payload or target expected Role revision differs from the current projection or from each other | Reject malformed mismatch or `STATE.STALE_VERSION` as applicable; append no activation Event |
+| LIF-024 | Expected Organization position is stale while the Role revision still matches | Reject `STREAM.CONCURRENCY_CONFLICT`; Role revision cannot bypass Organization concurrency |
+| LIF-025 | Authority lacks current `role.activate` scope, Policy denies, separation of duties fails, or required governance dependency is unavailable | Fail closed with the applicable governance code and append no `RoleActivated` |
+| LIF-026 | Constitution, current Policy, risk, separation of duties, or controlling Grant independently requires a Decision or Approval | Accept only with the valid current Decision or Approval; activation itself creates neither and grants no authority |
+| LIF-027 | Exact accepted ActivateRole Command is redelivered | Return the original disposition, identifiers, positions, and evaluation time; append and allocate nothing new |
+| LIF-028 | ActivateRole idempotency key is reused with changed Role, revision, target, or other material semantics | Reject `IDEMPOTENCY.CONFLICT`; preserve the original registration and state |
+| LIF-029 | Ordinary ActivateRole targets the stable genesis-derived founding Role identity | Apply the general already-active rejection; do not recreate, reactivate, or reinterpret genesis |
+| LIF-030 | ActivateRole payload/target is malformed, names an unsupported version, or crosses an Organization boundary | Reject at protocol/version/Organization validation before governance or domain transition; disclose no foreign state |
+| LIF-031 | Replay mixed canonical Organization history containing recognized non-Role transactions around activation, or encounters activation of a nonexistent or non-draft Role, invalid prior/resulting revision, duplicate activation, unknown or mismatched Organization Event type/version/payload/order, or missing or inconsistent `CommandAccepted(ActivateRole v1) -> RoleActivated -> AuditLinked` lineage or admission evidence | Traverse each complete recognized non-Role transaction without changing Role state; otherwise fail replay explicitly at the offending Event and never advance through, repair, skip, or execute corrupt history |
+| LIF-032 | Two Roles share a display name and one stable Role identity is activated | Transition only the referenced `role_id`; display name creates no identity, authority, or target ambiguity |
 
 ## 19. Scheduling and orchestration test suite
 

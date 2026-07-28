@@ -176,6 +176,17 @@ Historical Events and replay use the schema, Policy, transition rules, and speci
 | `stop_conditions` | Budget, time, Incident, safety, evidence, and external conditions |
 | `tool_request` | Tool, operation, exact bounded inputs/protected references, and result contract when applicable |
 
+Milestone 3 delegated capability Commands remain ordinary `CommandSubmission`
+records and use the authenticated recording-boundary contract. Their selected
+operation schema requires a canonical Task reference and exact requested
+capability. Only after admission, governance resolves the same-Organization
+Temporary Worker enrollment, active Role Assignment and Role, pinned source
+Authority Grant evidence, accepted nonterminal Task, exact capability
+allowlisting, and unconsumed deterministic Resource ceiling. No Worker-specific
+admission family, Work Item identifier, wildcard capability, or alternate Event
+stream is permitted. The complete profile is defined in
+[`GOVERNED_WORK_DELEGATION.md`](GOVERNED_WORK_DELEGATION.md).
+
 ### 5.1 ActivateRole subtype
 
 The sole ordinary Role activation operation has `operation_type=ActivateRole`, `operation_version=1.0`, `payload_type=ActivateRolePayload`, and `payload_version=1.0`. Its typed payload contains exactly:
@@ -219,6 +230,60 @@ The kernel MAY bind one evaluation time before resolution through its injected e
 After establishment, the admitted context contains the original immutable Command, canonical Organization and Actor identities, immutable admission proof, bound evaluation time, and prior Organization Events. Governance evaluates authorization; the domain handler evaluates deterministic domain semantics. A later governance or handler denial MAY append an attributable atomic rejection/audit sequence. A stale expected position returns a concurrency conflict without appending through that stale position; append failure cannot claim a durable rejection; idempotency conflict preserves the original registration; invalid history fails closed. Exact redelivery applies only to a previously recorded attributable disposition.
 
 Bootstrap remains on PF-17's reserved pre-Organization constitutional path and does not invoke `RecordingBoundaryResolver`. Ordinary Commands cannot select bootstrap traffic or admission basis. Replay consumes authoritative history and MUST NOT invoke admission resolution or authentication.
+
+### 5.3 Executable source Authority Grant proof
+
+Milestone 3 uses the immutable, capability-neutral
+`SourceAuthorityGrantClaim` and `SourceAuthorityGrantProof` records to prove the
+source of a later Task's attenuated authority. This proof is not an admission
+mechanism, an Authority Grant lifecycle API, or an authorization decision.
+`SourceAuthorityGrantResolver` is a read-only trusted boundary that resolves
+authoritative Grant evidence only after `AdmissionEstablished` has bound the
+canonical Organization and Actor. Caller assertions in the claim cannot create
+or replace that attribution.
+
+The claim binds one Command, canonical Organization, source Grant, grantor,
+authorized subject Actor, exact purpose, exact finite capability request, one
+Resource ceiling, deterministic completion condition, evaluation time, and
+schema version. The successful proof binds those facts to an active source
+Grant; its parent Grant and delegation basis; exact permitted and prohibited
+capability sets; the Grant Resource ceiling; an affirmative delegation right;
+the effective time and evaluated lifecycle state; Grant entity revision; and
+the authoritative Event, Organization-stream position, integrity, and evidence
+references from which the proof is derived.
+
+Capability tuples MUST be nonempty where authority is requested, duplicate-free,
+lexically ordered, and composed only of exact `CapabilityId` values. Wildcards,
+namespace patterns, and implicit capability discovery are invalid. Requested
+capabilities MUST be a subset of the permitted set and disjoint from the
+prohibited set. The sole Milestone 3 Resource dimension is
+`accepted_delegated_capability_execution`; containment requires the same
+`ResourceId` and unit and a positive requested integer limit no greater than the
+source Grant limit. The proof carries no consumption state.
+
+Constitutional purpose is descriptive rather than a policy language. Therefore
+this contract permits only exact normalized purpose equality; it does not infer
+semantic containment from prose. The deterministic Task termination condition
+must likewise equal the condition authorized by the source Grant. The proof is
+constructible only for a Grant recorded active and effective at its bound
+evaluation time and whose authoritative evidence expressly permits delegation.
+Suspended, expired, revoked, future-effective, malformed, unverifiable, or
+cross-Organization evidence fails closed for a new action.
+
+Consumers validate in this order: record shape and version; canonical
+Organization; Grant identity and immutable evidence; grantor and subject;
+lifecycle and effective time; exact purpose and affirmative delegation basis;
+exact capability containment; Resource containment; then complete downstream
+Task attenuation. Failure uses the existing stable `INPUT.*`, `VER.*`,
+`ORG.*`, `AUTH.*`, `RESOURCE.*`, `GOVERNANCE.*`, or `INTEGRITY.*` reasons in a
+typed `SourceAuthorityGrantDenied`; no new reason family is introduced.
+
+An accepted execution records the exact proof and evidence lineage used at its
+decision point. Replay validates that immutable recorded proof and MUST NOT call
+the resolver, consult current Grant state or policy, reinterpret ambient time,
+or perform external identity lookup. Later suspension, expiry, revocation, or
+policy change governs new actions only and cannot invalidate an already
+accepted historical execution.
 
 Every mutating `CommandSubmission` has an idempotency scope containing at least `(organization_id, initiating_actor_id, operation_family, idempotency_key)`. It also binds `original_operation_id` and the canonical semantic digest or equivalent exact comparison of every material operation field. Exact redelivery returns the original disposition, identifiers, stream positions, evaluation time, Resource effects, Approval-use result, and dispatch identity. Conflicting reuse preserves the first registration, fails closed, and discloses no other Actor's operation or key use.
 

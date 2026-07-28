@@ -111,6 +111,7 @@ stateDiagram-v2
 - Completion is Authorized when the completion condition is evidenced. Expiry is Automatic at the earliest time or condition. Neither can be extended retroactively; new work requires a new worker or authorized new grant before expiry.
 - Terminal states cannot return to active. Archival occurs only after result handoff, resource reconciliation, and credential revocation.
 - Expiry, completion, revocation, and archival end operational availability but never delete or reuse the worker's persistent Actor identity. Historical Events, Decisions, Artifacts, and Audit Records MUST continue to resolve it.
+- In the Milestone 3 first-worker profile, enrollment is the Temporary Worker specialization of the same Actor identity, not a second Worker entity. The profile has one Task, one active Role Assignment, one source Authority Grant, and one accepted-execution Resource ceiling. Terminal completion, failure, or cancellation of that Task satisfies the enrollment completion condition, immediately prevents new activity, and atomically records `WorkerCompleted` with the terminal Task Event. No ambient-time read is required.
 
 ## 6. Goal
 
@@ -169,6 +170,7 @@ stateDiagram-v2
 - Blocking reports an unmet dependency; suspension prevents new work due to governance, safety, authority, Policy, or resource conditions. Resume is Policy-required when suspension arose from an Incident, revocation, expired Approval, or safety control; otherwise it is Authorized after revalidation.
 - Completion requires result evidence and acceptance-criteria evaluation; consequential outputs require the Decision and Approval specified by Policy. Failure records attempted work and effects.
 - Cancellation is Policy-required when commitments or external effects exist; otherwise Authorized by the Goal owner. Terminal Tasks do not reopen. Retry is a new Task or an explicitly modeled attempt under the same still-active Task.
+- The Milestone 3 governed-delegation profile preserves these states: issuance records `TaskProposed`; governed acceptance records `TaskAccepted`; assignment records `TaskAssigned`; the assigned Temporary Worker accepts the Task through `TaskStarted`; and only `in_progress` permits delegated execution. The profile permits exactly one accepted delegated capability execution. Completion, failure, and cancellation are terminal, satisfy the one-Task Worker completion condition, and record `WorkerCompleted` atomically. A failed profile Task is never retried in place; retry requires a new Task with explicit causation.
 
 ## 8. Approval
 

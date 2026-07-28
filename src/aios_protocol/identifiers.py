@@ -45,6 +45,7 @@ class SubscriptionId(Identifier): pass
 class ApprovalId(Identifier): pass
 class ApprovalUseId(Identifier): pass
 class AuthorityGrantId(Identifier): pass
+class CapabilityId(Identifier): pass
 class DecisionId(Identifier): pass
 class ResourceId(Identifier): pass
 class MemoryRecordId(Identifier): pass
@@ -66,7 +67,7 @@ IDENTIFIER_TYPES = (
     MessageId, OrganizationId, ActorId, CommandId, EventId, StreamId,
     CorrelationId, OperationId, DeliveryId, DispatchId, AttemptId,
     ScheduleId, ScheduleInstanceId, SubscriptionId, ApprovalId,
-    ApprovalUseId, AuthorityGrantId, DecisionId, ResourceId,
+    ApprovalUseId, AuthorityGrantId, CapabilityId, DecisionId, ResourceId,
     MemoryRecordId, AuditRecordId, IntegrityReference, RoleId,
     RoleAssignmentId, MissionId, PolicyId, GoalId, IncidentId, ToolId, ExternalOperationId,
     ProjectionId, CheckpointId,

@@ -55,6 +55,15 @@ Actor attribution, not authorization. Denial is non-authoritative and permits
 no Organization stream, idempotency, audit, or Event effect. Bootstrap retains
 its distinct reserved constitutional admission path.
 
+Milestone 3 source-Grant attenuation starts with the immutable contracts in
+`aios_protocol.authority`. A `SourceAuthorityGrantClaim` asks a read-only
+trusted boundary to prove one exact, Organization-bound use; a
+`SourceAuthorityGrantProof` binds that use to active authoritative Grant
+evidence, exact finite capabilities, affirmative delegation, and one comparable
+Resource ceiling. These records neither administer Grants nor authorize or
+execute a capability. Historical replay validates the recorded proof without
+calling its resolver or consulting mutable current state.
+
 ## Constitutional bootstrap contracts
 
 Organization genesis uses `BootstrapEnvelope`, whose traffic mode is explicitly

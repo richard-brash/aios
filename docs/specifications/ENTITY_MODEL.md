@@ -106,7 +106,7 @@ The Organization is the AIOS tenancy, isolation, governance, and Event-ordering 
 ### Temporary Worker
 
 - **Purpose:** Provide bounded, purpose-specific specialist capacity.
-- **Description:** A persistent institutional Actor with temporary operational tenure, created for one bounded purpose. Its operational authority and availability are temporary, but its identity and attribution are durable.
+- **Description:** A persistent institutional Actor with temporary operational tenure, enrolled in one Organization for one bounded purpose. The enrollment is the Organization-scoped Temporary Worker specialization record for the existing Actor and shares its `actor_id`; it is not a second identity, credential, authentication principal, or independently attributable Worker entity. Its operational authority and availability are temporary, but its Actor identity and attribution are durable.
 - **Required attributes:** Actor attributes; `sponsor_actor_id`; `purpose`; `task_ids`; `authority_grant_ids`; `budget_ids`; `expires_at` or `completion_condition`; `delegation_permission`; `attribution_record_id`.
 - **Optional attributes:** model and tool eligibility; stop conditions; handoff target.
 - **Immutable fields:** `actor_id`, organization membership, `sponsor_actor_id`, original purpose, creation metadata. The identity is never reused. Purpose expansion requires a new worker.
@@ -115,6 +115,8 @@ The Organization is the AIOS tenancy, isolation, governance, and Event-ordering 
 - **Ownership:** The Organization owns the institutional identity and work product; the Sponsor is accountable but is not the owner.
 - **Lifecycle state:** `requested`, `active`, `suspended`, `completed`, `expired`, `revoked`, `archived`.
 - **Relationships:** belongs to exactly one Organization; has exactly one Human or Employee Sponsor; works for one purpose and one or more bounded Tasks; acts under grants derived from the Sponsor's authority; MUST NOT create sub-workers unless separately authorized. After expiry, completion, revocation, or archival, its historical identity remains resolvable by Events, Decisions, Artifacts, and Audit Records.
+
+The Milestone 3 first-worker profile narrows this general contract to one active Role Assignment, one source Authority Grant, and one Task. It uses one Task-scoped `budget_id` with unit `accepted_delegated_capability_execution`, authorized limit one, and `maximum_accepted_capability_executions=1` as its immutable Resource ceiling; terminality of that Task is the enrollment completion condition. These are profile constraints, not a new Worker entity or a general change to the ontology's support for one or more bounded Tasks.
 
 ### Role
 
@@ -216,6 +218,8 @@ A Work Root is the exclusive purpose anchor for a Task or Action. Every Task and
 - **Ownership:** Organization through exactly one Work Root.
 - **Lifecycle state:** `proposed`, `ready`, `assigned`, `in_progress`, `blocked`, `suspended`, `completed`, `failed`, `cancelled`, `archived`.
 - **Relationships:** belongs to exactly one Work Root; a Goal-rooted Task may optionally belong to one Project and advance Objectives; assigned to an Actor; consumes Resources and Budgets; invokes Tools; emits Events; produces Artifacts and Memory Records.
+
+For the Milestone 3 governed-delegation profile, the accepted Task additionally pins the assigned Temporary Worker Actor and enrollment evidence, qualifying Role Assignment, source Authority Grant and evidence version, a finite exact capability allowlist, immutable input or governed input reference, one Task-scoped Budget whose unit is accepted delegated capability execution and whose authorized limit is one, `maximum_accepted_capability_executions=1`, redelegation prohibition, and Task terminality as the worker completion condition. The Task only attenuates the Grant and never becomes authority itself. The full profile is defined in [`GOVERNED_WORK_DELEGATION.md`](GOVERNED_WORK_DELEGATION.md).
 
 ### Project
 

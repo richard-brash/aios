@@ -249,6 +249,8 @@ For an Employee, the kernel MUST enforce active organization membership, Role As
 
 For a Temporary Worker, the kernel MUST enforce one persistent Actor identity, exactly one Sponsor, one bounded purpose, eligible Tasks, least-privilege Tools, explicit Grant, Resource ceiling, expiry or completion condition, delegation prohibition unless separately authorized, and automatic suspension when Sponsor authority becomes inapplicable. Operational completion, expiry, revocation, or archival prevents new work but preserves resolvable identity and attribution.
 
+For the Milestone 3 first-worker profile, the Temporary Worker enrollment shares the authenticated Actor's identity and is limited to one active Role Assignment, one source Authority Grant, and one Task. The Task pins a finite exact capability set, strictly attenuates every comparable Grant dimension, prohibits redelegation, and permits exactly one accepted delegated capability execution. That accepted execution and Resource-ceiling consumption commit atomically in the Organization stream. Task completion, failure, or cancellation satisfies the enrollment completion condition and atomically records the Task terminal Event and `WorkerCompleted`. The kernel MUST revalidate current Grant, Worker, Assignment, Role, Task, Policy, and ceiling state for each new execution; later invalidation never rewrites prior accepted history.
+
 Worker creation, restoration, purpose, authority, budget, expiry, and archival transitions require the Events and gates in [`LIFECYCLES.md`](LIFECYCLES.md). The kernel MUST NOT spawn a worker because a model asks informally, capacity appears useful, or a Tool is available.
 
 ## 15. Tool invocation boundary

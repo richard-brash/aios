@@ -27,7 +27,7 @@ BOOTSTRAP_SCENARIO_MAP = {
 }
 
 # Ordinary draft Role creation coverage. This is focused slice evidence, not a
-# claim that the complete 260-scenario kernel conformance catalog is satisfied.
+# claim that the complete 277-scenario kernel conformance catalog is satisfied.
 CREATE_ROLE_SCENARIO_MAP = {
   "draft_creation": ("CMD-001", "LIF-013"),
   "active_creation_prohibited": ("LIF-014",),
@@ -38,4 +38,26 @@ CREATE_ROLE_SCENARIO_MAP = {
   "organization_isolation": ("CMD-004", "CMD-015"),
   "authority_fail_closed": ("AUT-008", "ADV-011"),
   "idempotency": ("CMD-008", "CMD-012"),
+}
+
+# Governed Role activation coverage. This remains focused slice evidence rather
+# than a claim of complete kernel conformance.
+ACTIVATE_ROLE_SCENARIO_MAP = {
+  "LIF-016": "test_authorized_activation_appends_one_versioned_domain_event",
+  "LIF-017": "test_authorized_activation_appends_one_versioned_domain_event",
+  "LIF-018": "test_activation_changes_only_state_and_revision",
+  "LIF-019": "test_event_payload_is_exact_and_replay_is_deterministic_without_effects",
+  "LIF-020": "test_nonexistent_and_already_active_roles_reject_invalid_transition",
+  "LIF-021": "test_nonexistent_and_already_active_roles_reject_invalid_transition",
+  "LIF-022": "test_all_non_draft_lifecycle_states_reject",
+  "LIF-023": "test_stale_role_revision_rejects_without_activation",
+  "LIF-024": "test_stale_organization_position_precedes_governance_and_allocates_nothing",
+  "LIF-025": "test_governance_denial_and_invalid_output_fail_closed",
+  "LIF-026": "test_independently_required_governance_evidence_fails_closed",
+  "LIF-027": "test_exact_redelivery_returns_original_without_append_or_allocation",
+  "LIF-028": "test_conflicting_idempotency_reuse_fails_closed",
+  "LIF-029": "test_founding_role_uses_the_general_already_active_rejection",
+  "LIF-030": "test_protocol_version_and_organization_validation_fail_closed",
+  "LIF-031": "test_activation_replay_lineage_and_mixed_history_conformance",
+  "LIF-032": "test_same_display_name_activates_only_stable_role_identity",
 }

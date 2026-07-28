@@ -194,6 +194,24 @@ identity before stale-version evaluation; a distinct duplicate Role identity is
 rejected by the handler and concurrent writes are serialized by the Organization
 append boundary.
 
-Role activation, assignment, hierarchy, workers, Tasks, planning, Tools,
-production persistence, APIs, and a general Policy engine remain deliberately
-deferred.
+## Governed Role activation
+
+`aios_kernel.activate_role` implements only `draft -> active`. Its typed payload
+contains the stable Role identity and expected entity revision. The ordinary
+envelope retains Organization and Actor attribution, asserted Authority,
+idempotency, evaluation time, and expected Organization position.
+
+Authenticated admission binds the completed Organization and initiating Actor
+before stream access. The injected governance boundary must prove
+`role.activate` before the pure handler validates draft state and Role revision.
+Success proposes one
+`RoleActivated` v1.0 Event on the Organization stream and advances only state
+and entity revision (`n -> n + 1`). The existing atomic append boundary owns
+authoritative metadata, idempotency, audit linkage, and Organization-wide
+concurrency. Replay folds the Event without governance or execution effects.
+The already-active founding Role follows the same invalid-transition rule as
+any active Role; identity never depends on its name.
+
+Role assignment, hierarchy, workers, Tasks, planning, Tools, production
+persistence, APIs, other lifecycle transitions, and a general Policy engine
+remain deliberately deferred.

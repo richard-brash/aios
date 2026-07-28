@@ -7,4 +7,8 @@ from .create_role import (
     OrganizationRoleProjection, RoleCreationAttributes, RoleProjection,
     replay_organization_roles,
 )
-__all__=["CreateTaskCommand","CreateTaskHandler","InitialTaskState","KernelRuntime","RuntimeCommand","replay","ConstitutionalBootstrapRuntime","replay_genesis","CreateRoleCommand","CreateRoleGovernanceEvaluator","CreateRoleHandler","OrganizationRoleProjection","RoleCreationAttributes","RoleProjection","replay_organization_roles"]
+from .activate_role import (
+    ActivateRoleCommand, ActivateRoleGovernanceEvaluator, ActivateRoleHandler,
+    ActivateRolePayload,
+)
+__all__=["CreateTaskCommand","CreateTaskHandler","InitialTaskState","KernelRuntime","RuntimeCommand","replay","ConstitutionalBootstrapRuntime","replay_genesis","CreateRoleCommand","CreateRoleGovernanceEvaluator","CreateRoleHandler","OrganizationRoleProjection","RoleCreationAttributes","RoleProjection","replay_organization_roles","ActivateRoleCommand","ActivateRoleGovernanceEvaluator","ActivateRoleHandler","ActivateRolePayload"]

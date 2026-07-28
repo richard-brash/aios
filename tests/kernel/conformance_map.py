@@ -25,3 +25,17 @@ BOOTSTRAP_SCENARIO_MAP = {
   "reserved_types": ("BST-012",),
   "replay": ("RPL-003", "RPL-005"),
 }
+
+# Ordinary draft Role creation coverage. This is focused slice evidence, not a
+# claim that the complete 260-scenario kernel conformance catalog is satisfied.
+CREATE_ROLE_SCENARIO_MAP = {
+  "draft_creation": ("CMD-001", "LIF-013"),
+  "active_creation_prohibited": ("LIF-014",),
+  "founding_role_distinct": ("LIF-015", "BST-001"),
+  "organization_stream": ("EVT-011", "EVT-012"),
+  "projection_replay": ("EVT-013", "RPL-003", "RPL-005"),
+  "organization_concurrency": ("EVT-003", "EVT-014"),
+  "organization_isolation": ("CMD-004", "CMD-015"),
+  "authority_fail_closed": ("AUT-008", "ADV-011"),
+  "idempotency": ("CMD-008", "CMD-012"),
+}

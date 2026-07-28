@@ -46,6 +46,12 @@ class CreateTaskHandler:
     operation_type = CREATE_TASK
     operation_version = CREATE_TASK_VERSION
 
+    def validate(self, command: RuntimeCommand):
+        if type(command) is not CreateTaskCommand:
+            return HandlerRejected(
+                ReasonCode.INPUT_MALFORMED, "CreateTask command is malformed")
+        return None
+
     def handle(self, context: HandlerContext):
         command = context.command
         if type(command) is not CreateTaskCommand:

@@ -113,6 +113,7 @@ class CommandHandler(Protocol):
     operation_type: str
     operation_version: RecordTypeVersion
 
+    def validate(self, command: RuntimeCommand) -> HandlerRejected | None: ...
     def handle(self, context: HandlerContext) -> HandlerResult: ...
 
 
@@ -364,6 +365,14 @@ class KernelRuntime:
             return self._reject_pre_boundary(
                 ReasonCode.VER_UNSUPPORTED,"supported_operation",
                 "operation or version is unsupported",evaluation_time)
+        structural=handler.validate(command)
+        if structural is not None:
+            if type(structural) is not HandlerRejected:
+                return self._reject_pre_boundary(
+                    ReasonCode.INTEGRITY_VERIFICATION_FAILED,"structure",
+                    "handler validation returned an invalid result",evaluation_time)
+            return self._reject_pre_boundary(
+                structural.reason_code,"structure",structural.safe_detail,evaluation_time)
 
         # Stage 2: trusted Organization and initiating-attribution resolution.
         claim=AdmissionClaim(
@@ -477,6 +486,7 @@ class KernelRuntime:
             all_proposals=(
                 DomainEventProposal("CommandAccepted",RECORD_V1,
                     FrozenMap({"operation_type":context.command.submission.operation_type,
+                               "operation_version":context.command.submission.operation_version,
                                "disposition_id":str(disposition_id)})),
                 *proposals,
                 DomainEventProposal("AuditLinked",RECORD_V1,

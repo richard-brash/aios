@@ -66,6 +66,7 @@ class FixtureHandler:
     operation_type="FixtureRecord"
     operation_version=VERSION
     def __init__(self): self.calls=0
+    def validate(self, command): return None
     def handle(self, context: HandlerContext):
         self.calls+=1
         value=context.command.submission.envelope.payload["fixture_value"]

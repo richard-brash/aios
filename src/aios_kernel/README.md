@@ -96,6 +96,17 @@ pre-Organization constitutional path and never uses this ordinary resolver.
 governance evaluation, adapters, or other effects. The in-memory runtime store
 under `reference/` is deterministic test support only.
 
+The draft Role projection consumes the complete canonical Organization history
+and validates the closed ordinary Event vocabulary supported by this stack. It
+validates every Event envelope, schema/version, identity, position, integrity
+link, and accepted or rejected transaction lineage before advancing. Valid
+CreateTask transactions and attributable rejections are traversed without
+changing Role state. A `RoleCreated` is authoritative only inside one complete
+`CommandAccepted(CreateRole)` / `RoleCreated` / `AuditLinked` sequence with the
+same Command, Actor, Organization, correlation, evaluation time, and audit
+identity. Unknown, malformed, orphaned, duplicated, or mismatched history stops
+replay without returning a partially advanced projection.
+
 This skeleton deliberately defers complete governance implementations,
 production persistence, projection catalogs, domain
 capabilities, scheduling, subscriptions, Tools, memory retrieval,
@@ -153,5 +164,36 @@ declarations and semantic coverage bind the vocabulary used by that history.
 
 This slice still does not provide production identity verification, general
 governance or Policy infrastructure, production persistence, distributed
-consensus, reconciliation execution, or any ordinary post-genesis Organization
-capability.
+consensus, reconciliation execution, or post-genesis behavior beyond the narrow
+draft Role creation slice below.
+
+## Ordinary draft Role creation
+
+`aios_kernel.create_role` is the first ordinary post-genesis capability. A
+typed `CreateRoleCommand` passes capability structure validation, proof of the
+replayed founded Organization, the injected governance boundary, and the pure
+Role handler before `RoleCreated` is appended to the authoritative Organization
+stream. The Event establishes exactly `[nonexistent] -> draft`; activation is a
+separate future governed action.
+
+A Role is durable organizational structure, not an Actor or Role Assignment.
+The projection is seeded with the active founding Role already established by
+genesis, then folds ordinary Organization Events to derive draft Roles and
+entity revisions. It never replays bootstrap execution and never creates a
+separate Role stream. The Organization expected stream position remains the
+write-concurrency boundary; Role identity is an additional domain precondition.
+
+The authenticated admission resolver proves completed genesis and binds the
+exact Organization and initiating Actor before any stream access. The handler
+receives only the resulting Organization Role projection, validates Role
+invariants, and performs no admission, governance, bootstrap, or persistence.
+`CreateRoleGovernanceEvaluator` requires asserted Authority evidence and
+delegates actual Authority evaluation to the existing injected boundary. Exact redelivery is
+resolved by Organization-, Actor-, operation-, and idempotency-scoped semantic
+identity before stale-version evaluation; a distinct duplicate Role identity is
+rejected by the handler and concurrent writes are serialized by the Organization
+append boundary.
+
+Role activation, assignment, hierarchy, workers, Tasks, planning, Tools,
+production persistence, APIs, and a general Policy engine remain deliberately
+deferred.

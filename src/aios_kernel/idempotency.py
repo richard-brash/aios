@@ -10,9 +10,6 @@ from collections.abc import Mapping
 
 from aios_protocol.identifiers import ActorId, Identifier, IntegrityReference, MessageId, OrganizationId
 
-from .create_task import CreateTaskCommand
-
-
 LogicalValue = None | bool | int | float | str | tuple[object, ...]
 
 
@@ -82,7 +79,7 @@ def _logical(value: object) -> LogicalValue:
     raise TypeError(f"unsupported semantic identity value type: {type(value).__name__}")
 
 
-def semantic_command_identity(command: CreateTaskCommand) -> tuple[object, ...]:
+def semantic_command_identity(command: object) -> tuple[object, ...]:
     """Return the complete immutable logical identity for CreateTask equivalence.
 
     Every caller-supplied CreateTask field is semantic except the envelope message_id,
@@ -160,6 +157,6 @@ def semantic_logical_fingerprint(value: object) -> str:
     return hashlib.sha256(_encode(_logical(value))).hexdigest()
 
 
-def semantic_command_fingerprint(command: CreateTaskCommand) -> str:
+def semantic_command_fingerprint(command: object) -> str:
     """Fingerprint the semantic logical value; the internal encoding is not a wire contract."""
     return hashlib.sha256(_encode(semantic_command_identity(command))).hexdigest()

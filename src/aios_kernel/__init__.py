@@ -1,5 +1,4 @@
-"""AIOS kernel CreateTask admission slice. Importing performs no I/O or allocation."""
-from .admission import CreateTaskAdmission
-from .create_task import CreateTaskCommand, InitialTaskState
+"""AIOS ordinary kernel. Importing performs no I/O or allocation."""
+from .create_task import CreateTaskCommand, CreateTaskHandler, InitialTaskState
 from .runtime import KernelRuntime, RuntimeCommand, replay
-__all__=["CreateTaskAdmission","CreateTaskCommand","InitialTaskState","KernelRuntime","RuntimeCommand","replay"]
+__all__=["CreateTaskCommand","CreateTaskHandler","InitialTaskState","KernelRuntime","RuntimeCommand","replay"]

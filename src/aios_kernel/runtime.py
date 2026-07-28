@@ -340,7 +340,7 @@ class KernelRuntime:
 
     def execute(self, command: object) -> KernelRuntimeResult:
         # Stage 1: effect-free structure, traffic, schema, and support validation.
-        if type(command) is not RuntimeCommand:
+        if not isinstance(command,RuntimeCommand):
             return self._reject_pre_boundary(
                 ReasonCode.INPUT_MALFORMED,"structure","Command structure is invalid",None)
         submission=command.submission
@@ -586,7 +586,11 @@ def semantic_runtime_command_identity(command: RuntimeCommand) -> tuple[object, 
             (name,getattr(submission,name))
             for name in submission.__dataclass_fields__ if name != "envelope"
         )),
-        ("expected_stream_position",command.expected_stream_position),
+        ("command",tuple(
+            (name,getattr(command,name))
+            for name in command.__dataclass_fields__
+            if name != "submission"
+        )),
     )
 
 

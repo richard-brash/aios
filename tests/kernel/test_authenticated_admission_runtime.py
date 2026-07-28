@@ -19,8 +19,9 @@ from aios_kernel.runtime import (
 from aios_protocol.admission import AdmissionEstablished
 from aios_protocol.envelope import BootstrapEnvelope, TrafficMode
 from aios_protocol.identifiers import ActorId, IntegrityReference, OrganizationId
+from aios_protocol.presence import NOT_APPLICABLE
 from aios_protocol.reason_codes import ReasonCode
-from aios_protocol.versions import RecordTypeVersion
+from aios_protocol.versions import PayloadVersion, RecordTypeVersion
 
 
 class RejectingHandler(FixtureHandler):
@@ -286,7 +287,9 @@ class AuthenticatedAdmissionRuntimeTests(unittest.TestCase):
         bootstrap=BootstrapEnvelope(
             command.submission.envelope.message_id,"Bootstrap",
             command.submission.envelope.correlation_id,
-            command.submission.envelope.issued_at,"restricted")
+            command.submission.envelope.issued_at,"restricted",
+            "constitutional genesis","BootstrapRequest",PayloadVersion("1.0"),
+            "bootstrap/runtime-isolation",NOT_APPLICABLE,NOT_APPLICABLE)
         result=kernel.execute(bootstrap)
         self.assertEqual(result.reason_code,ReasonCode.INPUT_MALFORMED)
         self.assertEqual(resolver.calls,[])

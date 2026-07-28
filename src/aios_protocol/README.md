@@ -54,3 +54,35 @@ kernel `RecordingBoundaryResolver` to either `AdmissionEstablished` or
 Actor attribution, not authorization. Denial is non-authoritative and permits
 no Organization stream, idempotency, audit, or Event effect. Bootstrap retains
 its distinct reserved constitutional admission path.
+
+## Constitutional bootstrap contracts
+
+Organization genesis uses `BootstrapEnvelope`, whose traffic mode is explicitly
+pre-Organization and which has no `organization_id`. It must not be represented
+by `CallerEnvelope`, `CommandSubmission`, or a runtime Command because those
+contracts require an already-existing Organization boundary.
+
+The bootstrap family separates four logical stages:
+
+1. `BootstrapRequest` supplies the verified founding Human, complete Organization
+   attributes, constitutional duty, founding Role and active Role Assignment,
+   Human-decided founding Decision, bounded initial Authority Grants, reserved
+   genesis recording Command, audit references, and complete proposed Event set.
+2. `BootstrapProposal` pins that complete proposed result without recording it.
+3. `BootstrapAcceptedDecision` or `BootstrapRejectedDecision` records the typed
+   constitutional admission disposition; acceptance is not durable genesis.
+4. `BootstrapCommitted` records the complete atomic result, while
+   `BootstrapPreviouslyAdmitted` and `BootstrapUncertain` preserve exact retry or
+   quarantine semantics.
+
+`FoundingEventSet` preserves the proposed logical order and
+`FoundingEventCoverage` maps every required founding fact to a proposal key.
+Concrete Event granularity and type strings remain explicit reserved-genesis
+protocol data because the normative specifications do not mandate one encoding
+or Event-name vocabulary. One Event may establish several facts, but missing
+coverage cannot construct a valid set.
+
+These are immutable structural records only. They do not verify Human identity,
+evaluate constitutional eligibility, resolve competing genesis, allocate IDs or
+stream positions, append Events, create an Organization projection, or execute
+bootstrap. Those behaviors remain the responsibility of a later kernel slice.

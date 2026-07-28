@@ -10,6 +10,7 @@ from .identifiers import (
     ActorId, AuditRecordId, CommandId, CorrelationId, IntegrityReference,
     MessageId, OrganizationId, StreamId,
 )
+from .presence import NOT_APPLICABLE, NotApplicable, Presence
 from .validation import EMPTY_MAP, FrozenMap, ensure_no_keys, require_aware, require_nonempty, require_type
 from .versions import PayloadVersion, RecordTypeVersion, RECORD_V1
 
@@ -190,11 +191,23 @@ class BootstrapEnvelope:
     correlation_id: CorrelationId
     issued_at: datetime
     classification: str
+    purpose: str
+    payload_type: str
+    payload_version: PayloadVersion
+    idempotency_key: str
+    causal_reference: Presence[str]
+    causation_message_id: Presence[MessageId]
     schema_version: RecordTypeVersion = RECORD_V1
     traffic_mode: TrafficMode = TrafficMode.PRE_ORGANIZATION
 
     def __post_init__(self) -> None:
         require_aware(self.issued_at, type(self).__name__, "issued_at")
+        for name in ("message_type", "classification", "purpose", "payload_type", "idempotency_key"):
+            require_nonempty(getattr(self, name), type(self).__name__, name)
+        if not isinstance(self.causal_reference, NotApplicable):
+            raise ValueError("independently initiated bootstrap causal_reference must be not applicable")
+        if not isinstance(self.causation_message_id, NotApplicable):
+            raise ValueError("independently initiated bootstrap causation_message_id must be not applicable")
         if self.traffic_mode is not TrafficMode.PRE_ORGANIZATION:
             raise ValueError("bootstrap envelope must be pre-organization")
 

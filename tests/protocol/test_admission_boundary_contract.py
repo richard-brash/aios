@@ -105,11 +105,11 @@ class AdmissionBoundaryContractTests(unittest.TestCase):
         self.assertIs(field.default, dataclasses.MISSING)
         self.assertIs(field.default_factory, dataclasses.MISSING)
 
-    def test_conformance_catalog_has_252_unique_scenarios(self):
+    def test_conformance_catalog_has_260_unique_scenarios(self):
         text = (ROOT / "docs/specifications/KERNEL_CONFORMANCE.md").read_text()
         identifiers = re.findall(r"^\| ([A-Z]{3}-[0-9]{3}) \|", text, re.MULTILINE)
-        self.assertEqual(len(identifiers), 252)
-        self.assertEqual(len(set(identifiers)), 252)
+        self.assertEqual(len(identifiers), 260)
+        self.assertEqual(len(set(identifiers)), 260)
         self.assertEqual(
             {f"ADB-{index:03d}" for index in range(1, 25)},
             {identifier for identifier in identifiers if identifier.startswith("ADB-")},

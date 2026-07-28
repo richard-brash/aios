@@ -96,7 +96,7 @@ Applicability abbreviations are `CMD` Command, `DSP` disposition, `EVT` Event, `
 | `message_id` | Globally stable identity of this logical message | Caller for request; kernel for kernel result; uniqueness validated | required: all | Immutable; historical records preserve identity; replay-control/report messages use distinct replay-mode identities and never live operational identities | Deduplication and forgery boundary |
 | `message_type` | Stable unambiguous type name | Record producer; validated against selected family/type version | required: all | Immutable; historical interpretation uses recorded version | Prevents type confusion |
 | `schema_version` | Logical record-type schema version | Producer; negotiation and validator constrain | required: all | Immutable; replay uses historical semantics | Prevents downgrade/reinterpretation |
-| `organization_id` | Sole Organization scope | Caller assertion then kernel validation; kernel result copies validated value | required: all except pre-org BTS/platform security | Immutable; replay preserves | Primary tenancy and authority boundary |
+| `organization_id` | Sole Organization scope and AIOS tenancy boundary | Caller assertion then kernel validation; kernel result copies validated value | required: all except pre-org BTS/platform security | Immutable; replay preserves | Primary isolation, governance, authority, and Event-ordering boundary; no separate Tenant entity or `tenant_id` |
 | `initiating_actor_id` | One technical initiating Actor | Caller assertion plus invocation proof; kernel resolves | required: CMD, OPS; BTS requires verified founding Human; other subtype schemas resolve optional or prohibited | Immutable; replay preserves | Attribution; not automatically decider |
 | `participant_actor_ids` | Other attributable participants | Caller asserts; kernel validates each | optional only for CMD, DSP, EVT, MEM, OPS subtypes that admit participants; prohibited otherwise | Immutable per message; replay preserves | Collective accountability, no authority aggregation |
 | `recording_command_id` | Command through which authoritative mutation was admitted | Kernel binds Events/mutations to admitted Command; caller may reference for result reports | required: EVT, APP and authoritative RES, MEM, OPS; Tool/result subtype schema resolves required or optional; prohibited: initial CMD | Immutable; replay preserves | Mutation provenance, distinct from cause |
@@ -107,9 +107,9 @@ Applicability abbreviations are `CMD` Command, `DSP` disposition, `EVT` Event, `
 | `issued_at` | Producer-asserted issue time | Producer; kernel treats as observation, not authoritative evaluation | required: requests; optional: reports whose schema permits producer time; prohibited otherwise | Immutable; replay preserves | Cannot determine authority expiry alone |
 | `evaluation_time` | Single authoritative admission time | Kernel-bound only | required: DSP, EVT, APP and admitted mutations; prohibited: caller requests | Immutable; replay uses recorded value | Prevents clock manipulation and nondeterminism |
 | `received_at` | Boundary-observed receipt time | Receiving boundary records as observation | optional only when the receiving-boundary subtype records it; prohibited otherwise | Immutable observation; not ordering authority | Latency/audit only; external skew tolerated |
-| `stream_id` | Organization authoritative Event stream | Kernel-bound | required: EVT, APP and stream-bound PRJ/RPL/SUB delivery; prohibited: caller-chosen or non-stream subtypes | Immutable; replay selects recorded stream | Prevents stream injection |
+| `stream_id` | Single authoritative Organization Event stream for post-genesis organizational state | Kernel-bound | required: EVT, APP and stream-bound PRJ/RPL/SUB delivery; prohibited: caller-chosen or non-stream subtypes | Immutable; replay selects recorded stream | Prevents stream injection and independent authoritative entity streams |
 | `stream_position` | Kernel-assigned Event order | Kernel-bound | required: accepted EVT and Event deliveries; optional for PRJ/RPL reports naming a position; prohibited: proposals/caller values | Immutable; replay preserves | Sole organization order authority |
-| `expected_stream_position` | Caller/preparer concurrency precondition | Caller or kernel append planner asserts; kernel compares current | required: APP and mutating subtype that declares optimistic concurrency; optional for eligible CMD/PRJ reads; prohibited otherwise | Immutable input; replay applies historical outcome | Prevents lost update |
+| `expected_stream_position` | Authoritative Organization-stream append precondition | Caller or kernel append planner asserts; kernel compares current Organization position | required: APP and post-genesis mutating subtype; optional for eligible CMD/PRJ reads; prohibited otherwise | Immutable input; replay applies historical outcome | Prevents lost update; entity preconditions cannot replace it |
 | `classification` | Message/payload disclosure class | Caller asserts minimum; kernel validates and may raise, never lower without authority | required: all except negotiation; VER subtype resolves required or prohibited | Immutable for record; later reclassification Event | Disclosure and filter boundary |
 | `purpose` | Specific authorized processing purpose | Caller asserts; kernel validates against Role, Grant, Policy, subscription | required: requests, retrieval, subscription; optional for permitted results; prohibited otherwise | Immutable; replay preserves | Purpose limitation |
 | `work_root` | Exactly one active Goal or complete duty for Task/Action | Caller asserts; kernel validates exclusive form and current scope | required: Task/Action and their work-related CMD/TLR/SUB/RES/OPS records; optional for consequential MEM when schema permits; prohibited for Project/Objective/Plan as root | Immutable for Task/Action; replay preserves | Prevents unrooted, dual-root, or invalid-kind work |
@@ -254,6 +254,8 @@ Corrections, supersession, redaction, and tombstone records reference the origin
 - complete audit references; and
 - one recording Command and bound evaluation time shared as required.
 
+Every post-genesis entity mutation uses the one Organization stream. A Role-affecting proposal therefore carries the Organization `stream_id` and `expected_stream_position`, plus any Role identity, current state, and `entity_revision` required as domain preconditions. Those domain preconditions MUST be evaluated against the same Organization history used for append and MUST NOT act as an independent Role-stream authorization. Role Events receive consecutive Organization positions alongside Events for other contained entities.
+
 | Outcome | Semantics |
 |---|---|
 | `AppendCommitted` | Entire set assigned consecutive positions and made authoritative atomically; committed reservation/use/intent identities returned |
@@ -270,6 +272,8 @@ Storage uncertainty MUST NOT be represented as success or confirmed nonappend. R
 `ProjectionResponse` contains source `stream_id`, last applied `stream_position`, Event-history integrity reference, projection-definition version, response `schema_version`, normative state with named `entity_revision`/business-content versions, governed external references and reconciliation status, presence/redaction semantics, and access audit reference. `ProjectionFailure` returns a stable code for gap, unknown schema, integrity mismatch, stale state, unavailable dependency, or classification denial.
 
 A response is not authoritative independently of its validated source history. External domain content is referenced, not fabricated or claimed reconstructed.
+
+Entity projections, including Role projections and filtered Event views, MUST be reproducible from the authoritative Organization stream. They MAY support entity-focused navigation and validation but MUST NOT expose or imply a separate authoritative per-entity Event history.
 
 Canonical relationship protocol is implemented within PF-05 Projection and PF-16 Audit rather than as a new top-level family:
 
@@ -575,7 +579,7 @@ The receiver MUST enforce:
 
 ## 24. Conformance traceability
 
-This matrix maps all 20 protocol families to the final 252 mandatory scenarios across 19 suites in `KERNEL_CONFORMANCE.md`; it does not duplicate their definitions. The authenticated recording-boundary contract is part of PF-01 Command and PF-02 disposition. PF-05 and PF-16 implement the canonical relationship records and PF-03 supplies their accepted Event history, together covering REL.
+This matrix maps all 20 protocol families to the final 260 mandatory scenarios across 19 suites in `KERNEL_CONFORMANCE.md`; it does not duplicate their definitions. The authenticated recording-boundary contract is part of PF-01 Command and PF-02 disposition. PF-05 and PF-16 implement the canonical relationship records and PF-03 supplies their accepted Event history, together covering REL.
 
 | Families | Primary conformance suites |
 |---|---|

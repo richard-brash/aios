@@ -16,7 +16,7 @@ This specification is governed by [`ARCHITECTURE_PRINCIPLES.md`](ARCHITECTURE_PR
 - **Implementation under test (IUT):** the complete kernel boundary being evaluated, including any specialized services to which it delegates normative mechanics.
 - **Test harness:** an external observer and fault controller that submits inputs, supplies controlled adapter and external-system behavior, captures outputs, and MUST NOT confer authority.
 - **Canonical fixture:** a versioned, reusable set of stable entities, Events, projections, Policies, and controlled external observations defined by this specification.
-- **Mandatory scenario:** a test whose identifier appears in Sections 12–28, Section 13.1, or the adversarial matrix. Every mandatory scenario MUST pass unless its requirement is formally inapplicable to a constitutionally valid implementation; the conformance report MUST justify and independently approve any inapplicability. The suite contains 252 catalog identifiers; a parameterized row may require multiple executions without changing that catalog count.
+- **Mandatory scenario:** a test whose identifier appears in Sections 12–28, Section 13.1, or the adversarial matrix. Every mandatory scenario MUST pass unless its requirement is formally inapplicable to a constitutionally valid implementation; the conformance report MUST justify and independently approve any inapplicability. The suite contains 260 catalog identifiers; a parameterized row may require multiple executions without changing that catalog count.
 - **Disposition:** `accepted`, `rejected`, `previously_admitted`, `paused`, or `escalated` as defined by the kernel admission output contract.
 - **Safe failure:** no unauthorized transition, disclosure, Tool dispatch, Resource or Approval mutation, success assertion, or replay effect; an attributable rejection, pause, suspension, reconciliation, Incident, or escalation is recorded where a valid recording boundary exists.
 - **Exact semantic equality:** equality of every normative field and meaning after canonical normalization, regardless of serialization syntax or field order.
@@ -179,22 +179,22 @@ Every rejection and injected failure MUST prove the absence of unauthorized targ
 
 ## 10. Minimum conformance test matrix
 
-The minimum suite contains 252 mandatory scenarios. Every scenario MUST be instantiated using the normative test-case format in Section 4.5.
+The minimum suite contains 260 mandatory scenarios. Every scenario MUST be instantiated using the normative test-case format in Section 4.5.
 
 | Suite | Identifier range | Mandatory scenarios | Primary contract |
 |---|---|---:|---|
 | Adversarial and fault injection | `ADV-001`–`ADV-022` | 22 | Safe behavior under unavailable, hostile, corrupt, delayed, duplicated, and live-effect conditions |
 | Bootstrap | `BST-001`–`BST-012` | 12 | Atomic constitutional genesis and permanent bootstrap-authority containment |
-| Command admission | `CMD-001`–`CMD-014` | 14 | Validation, attribution, isolation, versions, idempotency, and evaluation time |
+| Command admission | `CMD-001`–`CMD-015` | 15 | Validation, attribution, Organization isolation, versions, idempotency, and evaluation time |
 | Authenticated admission boundary | `ADB-001`–`ADB-024` | 24 | Pre-boundary rejection, exact Organization and Actor attribution, mutation prohibition, and bootstrap separation |
 | Authority and Policy | `AUT-001`–`AUT-016` | 16 | Explicit authority, delegation, precedence, and Human accountable-decider power |
 | Work Root | `WRT-001`–`WRT-010` | 10 | Exclusive Goal-or-duty traceability with optional planning structures |
 | Approval | `APR-001`–`APR-014` | 14 | Mode, atomic usage, separation from Authority, and concurrency |
 | Resource governance | `RES-001`–`RES-012` | 12 | Pre-dispatch reservation, aggregation, independent dimensions, and reconciliation |
-| Lifecycle | `LIF-001`–`LIF-012` | 12 | Legal transitions, dependencies, evidence, suspension, and durable identity |
+| Lifecycle | `LIF-001`–`LIF-015` | 15 | Legal transitions, Role creation, dependencies, evidence, suspension, and durable identity |
 | Scheduling and orchestration | `SCH-001`–`SCH-015` | 15 | Governed schedule admission and trigger enforcement without scheduling strategy |
 | Tool and reconciliation | `TOL-001`–`TOL-012` | 12 | Authorization/attempt/result separation and adapter containment |
-| Event ordering and idempotency | `EVT-001`–`EVT-010` | 10 | Immutability, organization order, causal provenance, and epistemic validity |
+| Event ordering and idempotency | `EVT-001`–`EVT-014` | 14 | Immutability, Organization-wide order, entity projection, causal provenance, and epistemic validity |
 | Canonical relationships | `REL-001`–`REL-007` | 7 | Canonical relationship authority, inverse projection integrity, and replay rebuilding |
 | Subscription isolation | `SUB-001`–`SUB-010` | 10 | Organization, purpose, classification, order, and redelivery |
 | Memory governance | `MEM-001`–`MEM-012` | 12 | Provenance, admission, retrieval, conflict, retention, and derived records |
@@ -202,7 +202,7 @@ The minimum suite contains 252 mandatory scenarios. Every scenario MUST be insta
 | Audit and Decisions | `AUD-001`–`AUD-015` | 15 | Complete consequential trace, Decision-state revalidation, and collective attribution |
 | Replay and recovery | `RPL-001`–`RPL-015` | 15 | Projection equivalence, governed availability, history integrity, and zero effects |
 | Portability and model replacement | `POR-001`–`POR-008` | 8 | Institutional continuity across environments and replaceable models |
-| **Total** |  | **252** | All scenarios are independently mandatory |
+| **Total** |  | **260** | All scenarios are independently mandatory |
 
 ## 11. Adversarial and fault-injection matrix
 
@@ -268,6 +268,7 @@ The following cross-cutting fault scenarios are mandatory. Each fault MUST also 
 | CMD-012 | Reuse idempotency key with changed payload, Work Root, or target | Reject idempotency conflict; preserve first disposition |
 | CMD-013 | Redeliver original after wall clock advances beyond Grant expiry | Return original evaluation time and disposition; do not reevaluate as a new Command |
 | CMD-014 | Bind same original inputs to two precommit evaluations | Produce exact semantic equality of disposition and Event set |
+| CMD-015 | Ordinary protocol submission supplies Organization scope but no separate Tenant entity or `tenant_id` | Evaluate isolation by `organization_id`; accept or reject on other gates without requiring or inventing another domain boundary |
 
 ### 13.1 Authenticated recording-boundary test suite
 
@@ -388,6 +389,9 @@ This suite proves the ordinary post-genesis boundary between effect-free input h
 | LIF-010 | Memory correction is submitted | Append linked correction/supersession; preserve prior Record and provenance |
 | LIF-011 | Organization deletion requested while active | Reject; require lawful dissolution, retention, hold, and tombstone path |
 | LIF-012 | Incident closes without independent-enough review or remediation evidence | Reject closure |
+| LIF-013 | Ordinarily create a post-genesis Role | Append a Role creation Event whose resulting Role state is exactly `draft` |
+| LIF-014 | Ordinary Role creation requests initial state `active` | Reject illegal transition; create no Role and append no Role lifecycle Event |
+| LIF-015 | Replay genesis containing the constitutional owner or governor Role | Preserve the founding Role under reserved bootstrap semantics; do not reinterpret it as or require an ordinary `[nonexistent] -> draft` creation |
 
 ## 19. Scheduling and orchestration test suite
 
@@ -442,6 +446,10 @@ This suite tests governed schedule admission, persistence, due-trigger materiali
 | EVT-008 | Same idempotency key has different evaluation time but identical payload | Treat as conflicting retry unless it is exact redelivery returning original bound time |
 | EVT-009 | Recording Command and external causal reference differ | Preserve both fields without treating admission as external cause |
 | EVT-010 | Parameterized Event applicability cases: required field missing; prohibited field present; invented placeholder for irrelevant field; valid deterministic mechanical Event whose schema permits epistemic status or confidence not applicable; valid consequential Event with every material field | Reject the first three schema/applicability violations; accept the mechanical and consequential controls; compare every applicable field exactly without requiring ceremonial values |
+| EVT-011 | Role lifecycle Event is proposed for a separate authoritative Role stream | Reject the authoritative-stream claim; append post-genesis Role Events only to the Organization stream |
+| EVT-012 | Events for two different Roles and another contained entity are accepted concurrently | Assign one monotonic Organization order with no duplicated or independently authoritative positions |
+| EVT-013 | Role projection and entity-filtered Event view are discarded and rebuilt | Reproduce them from the ordered Organization stream without issuing Events or consulting a per-Role authority source |
+| EVT-014 | Role state/revision precondition passes but expected Organization stream position is stale | Reject or reevaluate atomically; the entity precondition cannot bypass Organization-stream concurrency and no Role Event appends |
 
 ## 22. Canonical relationship test suite
 

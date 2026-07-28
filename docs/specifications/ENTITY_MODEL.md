@@ -34,6 +34,8 @@ In these specifications, **Employee** means the Constitution's AI Employee and e
 
 Ownership means constitutional control and accountability, not technical possession. Actors, including AI Employees and Temporary Workers, are members or agents of an Organization and never own organizational assets. A Human may legally own or govern an Organization. Where a lifecycle includes deletion, deletion means inaccessible content plus a lawful minimal tombstone; it never means rewriting event history.
 
+The Organization is the AIOS tenancy, isolation, governance, and Event-ordering boundary. AIOS defines no separate Tenant entity or `tenant_id`; an implementation hosting multiple Organizations MUST preserve isolation by `organization_id`. All authoritative post-genesis Events for Organization-contained entities are recorded in the single monotonically ordered Organization stream. Entity-specific views and indexes are derived from that history and are not independent authoritative streams.
+
 ## 2. Identity and organization entities
 
 ### Organization
@@ -126,6 +128,8 @@ Ownership means constitutional control and accountability, not technical possess
 - **Ownership:** Organization.
 - **Lifecycle state:** `draft`, `active`, `suspended`, `retired`, `archived`.
 - **Relationships:** assigned to Actors through attributable role assignments; referenced by Policies, Goals, Tasks, approval routing, and Authority Grants.
+
+For ordinary post-genesis Role creation, the sole legal initial transition is `[nonexistent] -> draft`. Ordinary creation MUST NOT establish an `active` Role; activation is a distinct governed transition and action. The constitutional owner or governor Role established atomically during bootstrap is a reserved genesis case and MUST NOT be recreated through ordinary Role creation.
 
 ### Role Assignment
 

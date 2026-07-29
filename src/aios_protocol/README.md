@@ -95,6 +95,12 @@ Task acceptance is represented only by an atomic paired proof whose immediately
 ordered `WorkerCompleted` evidence shares the Command, audit, and append
 boundary. These records perform no persistence, capability execution, Resource
 consumption, or lifecycle mutation.
+`TaskStarted` reuses the existing immutable `AdmissionEstablished` record to
+prove that the exact assigned Worker Actor initiated that Command; qualification
+evidence alone is not attribution. Terminal outcome evidence independently
+records acceptance-criteria satisfaction and any optional structured accepted
+execution lineage, so failure and cancellation do not imply a successful
+capability execution.
 
 ## Constitutional bootstrap contracts
 

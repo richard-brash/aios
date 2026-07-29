@@ -254,9 +254,26 @@ Organization-stream position, integrity, audit, Command, and evaluation
 lineage. Proposal and acceptance require source-Grant attenuation bound to the
 exact Command and Task scope. Assignment and start require current immutable
 active enrollment and exact active Role Assignment evidence in the same
-Organization. Only the accepted `in_progress` state qualifies later delegated
-execution; an accepted delegated execution reference does not itself transition
-the Task.
+Organization. `TaskStarted` additionally requires the existing immutable
+`AdmissionEstablished` proof for that exact Command. Its canonical admitted
+Organization MUST equal the Task Organization, its initiating Actor MUST equal
+the assigned Temporary Worker Actor, its supported admission versions MUST be
+current, and its identity, invocation, authentication, Organization-genesis,
+and admission-mechanism references MUST be retained in transition integrity
+lineage. Qualification never substitutes for Command authorship, and the pure
+contract performs no authentication or mutable admission lookup. Only the
+accepted `in_progress` state qualifies later delegated execution; an accepted
+delegated execution reference does not itself transition the Task.
+
+Terminal outcome evidence distinguishes acceptance-criteria satisfaction from
+capability execution. `TaskCompleted` MUST cite immutable evidence that its
+acceptance criteria were satisfied; accepted execution lineage alone is not
+that evidence. `TaskFailed` and `TaskCancelled` may cite zero or more accepted
+delegated executions. Any cited accepted execution is a structured immutable
+record bound to the same Organization, Task, and Worker and is unique and
+canonically ordered by integrity reference. Rejected attempts are not accepted
+execution evidence and neither appear in that collection nor consume the Task
+Budget.
 
 A terminal Task transition is not an independently accepted protocol result.
 For the one-Task enrollment it is accepted only as one atomic paired proof

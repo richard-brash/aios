@@ -4,6 +4,7 @@ import dataclasses
 import unittest
 from datetime import datetime, timedelta, timezone
 
+from aios_protocol.admission import AdmissionEstablished
 from aios_protocol.authority import (
     ACCEPTED_DELEGATED_EXECUTION_UNIT, SourceAuthorityGrantClaim,
     SourceAuthorityGrantLifecycle, SourceAuthorityGrantProof,
@@ -20,7 +21,7 @@ from aios_protocol.governed_task import (
 )
 from aios_protocol.identifiers import (
     ActorId, AuditRecordId, AuthorityGrantId, BudgetId, CapabilityId, CommandId,
-    EventId, IntegrityReference, OrganizationId, ResourceId, RoleAssignmentId,
+    EventId, IntegrityReference, MessageId, OrganizationId, ResourceId, RoleAssignmentId,
     RoleId, TaskId,
 )
 from aios_protocol.reason_codes import ReasonCode
@@ -40,7 +41,8 @@ from aios_protocol.temporary_worker import (
     TemporaryWorkerTransitionClaim,
     TemporaryWorkerTransitionProof,
 )
-from aios_protocol.validation import FrozenMap
+from aios_protocol.validation import FrozenMap, StructuralValidationError
+from aios_protocol.versions import RECORD_V1, RecordTypeVersion
 
 
 T = datetime(2034, 5, 6, 7, 8, tzinfo=timezone.utc)
@@ -225,6 +227,51 @@ def worker_qualification(command_id: CommandId) -> TaskWorkerQualificationEviden
     )
 
 
+def admitted_worker(command_id: CommandId, **changes) -> AdmissionEstablished:
+    values = dict(
+        claim_message_id=MessageId(f"message:{command_id}"),
+        command_id=command_id,
+        organization_id=ORG,
+        initiating_actor_id=WORKER,
+        organization_genesis_reference=IntegrityReference("integrity:organization-genesis"),
+        actor_identity_reference=IntegrityReference("integrity:worker-identity"),
+        invocation_proof_reference=IntegrityReference("integrity:invocation-proof"),
+        authentication_evidence_references=(IntegrityReference("integrity:authentication"),),
+        admission_mechanism_reference=IntegrityReference("integrity:admission-mechanism"),
+        admission_mechanism_version=RECORD_V1,
+    )
+    values.update(changes)
+    return AdmissionEstablished(**values)
+
+
+def start_evidence_references() -> tuple[IntegrityReference, ...]:
+    return tuple(sorted((
+        IntegrityReference("evidence:task-transition"),
+        IntegrityReference("integrity:admission-mechanism"),
+        IntegrityReference("integrity:authentication"),
+        IntegrityReference("integrity:invocation-proof"),
+        IntegrityReference("integrity:organization-genesis"),
+        IntegrityReference("integrity:worker-identity"),
+    ), key=str))
+
+
+def accepted_execution(
+    suffix: str = "one", **changes,
+) -> AcceptedDelegatedCapabilityExecutionEvidence:
+    values = dict(
+        command_id=CommandId(f"command:execution-{suffix}"),
+        organization_id=ORG,
+        task_id=TASK,
+        worker_actor_id=WORKER,
+        capability_id=CAPABILITY,
+        source_event_id=EventId(f"event:execution-{suffix}"),
+        source_stream_position=25,
+        integrity_reference=IntegrityReference(f"integrity:execution-{suffix}"),
+    )
+    values.update(changes)
+    return AcceptedDelegatedCapabilityExecutionEvidence(**values)
+
+
 def prior(state: TaskLifecycle, revision: int, **changes) -> TaskPriorTransitionEvidence:
     values = dict(
         organization_id=ORG, task_id=TASK, lifecycle_state=state,
@@ -239,10 +286,11 @@ def outcome(state: TaskLifecycle, **changes) -> TaskOutcomeEvidence:
     values = dict(
         organization_id=ORG, task_id=TASK, worker_actor_id=WORKER,
         terminal_state=state, outcome_reference=IntegrityReference("outcome:task"),
-        accepted_execution_references=(
-            () if state is TaskLifecycle.CANCELLED
-            else (IntegrityReference("execution:accepted"),)
+        acceptance_criteria_satisfaction_reference=(
+            IntegrityReference("evidence:acceptance-criteria")
+            if state is TaskLifecycle.COMPLETED else None
         ),
+        accepted_execution_evidence=(),
         evidence_references=(IntegrityReference("evidence:outcome"),),
     )
     values.update(changes)
@@ -269,8 +317,13 @@ def claim(transition: TaskTransition = TaskTransition.PROPOSE, **changes) -> Tas
         evaluation_time=T,
         issuance_authority_evidence=(issuance(command_id) if transition in (TaskTransition.PROPOSE, TaskTransition.ACCEPT) else None),
         worker_qualification_evidence=(worker_qualification(command_id) if transition in (TaskTransition.ASSIGN, TaskTransition.START) else None),
+        initiating_actor_admission=(admitted_worker(command_id) if transition is TaskTransition.START else None),
         outcome_evidence=(outcome(result) if transition in (TaskTransition.COMPLETE, TaskTransition.FAIL, TaskTransition.CANCEL) else None),
-        transition_evidence_references=(IntegrityReference("evidence:task-transition"),),
+        transition_evidence_references=(
+            start_evidence_references()
+            if transition is TaskTransition.START
+            else (IntegrityReference("evidence:task-transition"),)
+        ),
     )
     values.update(changes)
     return TaskTransitionClaim(**values)
@@ -421,13 +474,111 @@ class GovernedTaskContractTests(unittest.TestCase):
         self.assertFalse(hasattr(denied, "worker_completion_proof"))
 
     def test_successful_delegated_execution_is_not_a_lifecycle_transition(self):
-        execution = AcceptedDelegatedCapabilityExecutionEvidence(
-            CommandId("command:execute"), ORG, TASK, WORKER, CAPABILITY,
-            EventId("event:execution"), 25, IntegrityReference("integrity:execution"),
-        )
+        execution = accepted_execution()
         self.assertNotIsInstance(execution, (TaskTransitionProof, TemporaryWorkerTransitionProof))
         self.assertTrue(task_proof(TaskTransition.START).qualifies_delegated_execution)
         self.assertFalse(task_proof(TaskTransition.ACCEPT).qualifies_delegated_execution)
+
+    def test_task_start_requires_exact_authenticated_worker_attribution(self):
+        started = claim(TaskTransition.START)
+        self.assertEqual(started.initiating_actor_admission.initiating_actor_id, WORKER)
+        mismatches = (
+            {"initiating_actor_id": ActorId("actor:other")},
+            {"organization_id": OrganizationId("org:other")},
+            {"command_id": CommandId("command:other")},
+            {"schema_version": RecordTypeVersion("2.0")},
+        )
+        for changes in mismatches:
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                claim(
+                    TaskTransition.START,
+                    initiating_actor_admission=dataclasses.replace(
+                        admitted_worker(CommandId("command:task-start")), **changes,
+                    ),
+                )
+
+    def test_qualification_alone_does_not_establish_start_command_authorship(self):
+        with self.assertRaises(ValueError):
+            claim(TaskTransition.START, initiating_actor_admission=None)
+        with self.assertRaises(ValueError):
+            claim(
+                TaskTransition.START,
+                transition_evidence_references=(IntegrityReference("evidence:task-transition"),),
+            )
+
+    def test_failure_and_cancellation_allow_zero_or_more_accepted_executions(self):
+        failed_without = outcome(TaskLifecycle.FAILED)
+        self.assertEqual(failed_without.accepted_execution_evidence, ())
+        failed_with = outcome(
+            TaskLifecycle.FAILED,
+            accepted_execution_evidence=(accepted_execution(),),
+        )
+        self.assertEqual(len(failed_with.accepted_execution_evidence), 1)
+        for executions in ((), (accepted_execution(),)):
+            with self.subTest(executions=executions):
+                cancelled = outcome(
+                    TaskLifecycle.CANCELLED,
+                    accepted_execution_evidence=executions,
+                )
+                self.assertEqual(cancelled.accepted_execution_evidence, executions)
+        failed_claim = claim(
+            TaskTransition.FAIL,
+            outcome_evidence=outcome(
+                TaskLifecycle.FAILED,
+                accepted_execution_evidence=(accepted_execution(),),
+            ),
+        )
+        self.assertEqual(
+            len(paired_terminal(
+                TaskTransition.FAIL,
+                task_proof=task_proof(TaskTransition.FAIL, claim=failed_claim),
+            ).task_proof.claim.outcome_evidence.accepted_execution_evidence),
+            1,
+        )
+        cancelled_claim = claim(
+            TaskTransition.CANCEL,
+            outcome_evidence=outcome(
+                TaskLifecycle.CANCELLED,
+                accepted_execution_evidence=(accepted_execution(),),
+            ),
+        )
+        self.assertEqual(
+            len(paired_terminal(
+                TaskTransition.CANCEL,
+                task_proof=task_proof(TaskTransition.CANCEL, claim=cancelled_claim),
+            ).task_proof.claim.outcome_evidence.accepted_execution_evidence),
+            1,
+        )
+
+    def test_accepted_execution_lineage_is_structured_unique_and_canonical(self):
+        first = accepted_execution("a")
+        second = accepted_execution("b")
+        with self.assertRaises(ValueError):
+            outcome(TaskLifecycle.FAILED, accepted_execution_evidence=(first, first))
+        with self.assertRaises(ValueError):
+            outcome(TaskLifecycle.FAILED, accepted_execution_evidence=(second, first))
+        with self.assertRaises((TypeError, ValueError)):
+            outcome(
+                TaskLifecycle.FAILED,
+                accepted_execution_evidence=(IntegrityReference("execution:rejected"),),
+            )
+        with self.assertRaises(ValueError):
+            outcome(
+                TaskLifecycle.FAILED,
+                accepted_execution_evidence=(
+                    accepted_execution("other", task_id=TaskId("task:other")),
+                ),
+            )
+
+    def test_completed_task_requires_acceptance_criteria_evidence_not_execution(self):
+        completed = outcome(TaskLifecycle.COMPLETED)
+        self.assertEqual(completed.accepted_execution_evidence, ())
+        self.assertIsNotNone(completed.acceptance_criteria_satisfaction_reference)
+        with self.assertRaises(StructuralValidationError):
+            outcome(
+                TaskLifecycle.COMPLETED,
+                acceptance_criteria_satisfaction_reference=None,
+            )
 
     def test_exact_capability_scope_rejects_nonexact_empty_duplicate_and_noncanonical(self):
         invalid = (

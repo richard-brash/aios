@@ -7,6 +7,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Protocol
 
+from .admission import AdmissionEstablished
 from .authority import (
     ACCEPTED_DELEGATED_EXECUTION_UNIT,
     SourceAuthorityGrantClaim,
@@ -344,13 +345,41 @@ class TaskPriorTransitionEvidence:
 
 
 @dataclass(frozen=True, slots=True)
+class AcceptedDelegatedCapabilityExecutionEvidence:
+    """Historical accepted execution lineage; never a Task transition or attempt."""
+
+    command_id: CommandId
+    organization_id: OrganizationId
+    task_id: TaskId
+    worker_actor_id: ActorId
+    capability_id: CapabilityId
+    source_event_id: EventId
+    source_stream_position: int
+    integrity_reference: IntegrityReference
+    schema_version: RecordTypeVersion = RECORD_V1
+
+    def __post_init__(self) -> None:
+        for name, expected in (
+            ("command_id", CommandId), ("organization_id", OrganizationId),
+            ("task_id", TaskId), ("worker_actor_id", ActorId),
+            ("capability_id", CapabilityId), ("source_event_id", EventId),
+            ("integrity_reference", IntegrityReference), ("schema_version", RecordTypeVersion),
+        ):
+            require_type(getattr(self, name), expected, type(self).__name__, name)
+        require_positive(self.source_stream_position, type(self).__name__, "source_stream_position")
+        if type(self.source_stream_position) is not int:
+            raise TypeError("source_stream_position must be int")
+
+
+@dataclass(frozen=True, slots=True)
 class TaskOutcomeEvidence:
     organization_id: OrganizationId
     task_id: TaskId
     worker_actor_id: ActorId
     terminal_state: TaskLifecycle
     outcome_reference: IntegrityReference
-    accepted_execution_references: tuple[IntegrityReference, ...]
+    acceptance_criteria_satisfaction_reference: IntegrityReference | None
+    accepted_execution_evidence: tuple["AcceptedDelegatedCapabilityExecutionEvidence", ...]
     evidence_references: tuple[IntegrityReference, ...]
     schema_version: RecordTypeVersion = RECORD_V1
 
@@ -363,14 +392,31 @@ class TaskOutcomeEvidence:
             require_type(getattr(self, name), expected, type(self).__name__, name)
         if self.terminal_state not in (TaskLifecycle.COMPLETED, TaskLifecycle.FAILED, TaskLifecycle.CANCELLED):
             raise ValueError("Task outcome must name a terminal state")
-        executions = tuple(self.accepted_execution_references)
-        for item in executions:
-            require_type(item, IntegrityReference, type(self).__name__, "accepted_execution_references")
-        if len(set(executions)) != len(executions) or executions != tuple(sorted(executions, key=str)):
-            raise ValueError("accepted execution references must be unique and canonical")
-        if self.terminal_state in (TaskLifecycle.COMPLETED, TaskLifecycle.FAILED) and not executions:
-            raise ValueError("completed or failed Task requires accepted execution lineage")
-        object.__setattr__(self, "accepted_execution_references", executions)
+        if self.terminal_state is TaskLifecycle.COMPLETED:
+            require_type(
+                self.acceptance_criteria_satisfaction_reference, IntegrityReference,
+                type(self).__name__, "acceptance_criteria_satisfaction_reference",
+            )
+        elif self.acceptance_criteria_satisfaction_reference is not None:
+            raise ValueError("only TaskCompleted may claim acceptance-criteria satisfaction")
+        executions = tuple(self.accepted_execution_evidence)
+        for index, item in enumerate(executions):
+            require_type(
+                item, AcceptedDelegatedCapabilityExecutionEvidence,
+                type(self).__name__, f"accepted_execution_evidence[{index}]",
+            )
+            if (
+                item.organization_id != self.organization_id
+                or item.task_id != self.task_id
+                or item.worker_actor_id != self.worker_actor_id
+            ):
+                raise ValueError("accepted execution evidence names another Task boundary")
+        keys = tuple(item.integrity_reference for item in executions)
+        if len(set(keys)) != len(keys):
+            raise ValueError("accepted execution evidence must not contain duplicates")
+        if executions != tuple(sorted(executions, key=lambda item: str(item.integrity_reference))):
+            raise ValueError("accepted execution evidence must use canonical integrity ordering")
+        object.__setattr__(self, "accepted_execution_evidence", executions)
         object.__setattr__(self, "evidence_references", _canonical_evidence(
             self.evidence_references, record_type=type(self).__name__, field_path="evidence_references",
         ))
@@ -401,6 +447,7 @@ class TaskTransitionClaim:
     evaluation_time: datetime
     issuance_authority_evidence: TaskIssuanceAuthorityEvidence | None
     worker_qualification_evidence: TaskWorkerQualificationEvidence | None
+    initiating_actor_admission: AdmissionEstablished | None
     outcome_evidence: TaskOutcomeEvidence | None
     transition_evidence_references: tuple[IntegrityReference, ...]
     schema_version: RecordTypeVersion = RECORD_V1
@@ -442,6 +489,14 @@ class TaskTransitionClaim:
             self._validate_qualification()
         elif self.worker_qualification_evidence is not None:
             raise ValueError("transition does not accept unrelated worker qualification")
+        if self.transition is TaskTransition.START:
+            require_type(
+                self.initiating_actor_admission, AdmissionEstablished,
+                type(self).__name__, "initiating_actor_admission",
+            )
+            self._validate_start_attribution()
+        elif self.initiating_actor_admission is not None:
+            raise ValueError("only TaskStarted accepts initiating-Actor admission evidence")
         terminal = self.transition in (TaskTransition.COMPLETE, TaskTransition.FAIL, TaskTransition.CANCEL)
         if terminal:
             require_type(self.outcome_evidence, TaskOutcomeEvidence, type(self).__name__, "outcome_evidence")
@@ -457,6 +512,27 @@ class TaskTransitionClaim:
         object.__setattr__(self, "transition_evidence_references", _canonical_evidence(
             self.transition_evidence_references, record_type=type(self).__name__, field_path="transition_evidence_references",
         ))
+
+    def _validate_start_attribution(self) -> None:
+        admission = self.initiating_actor_admission
+        assert admission is not None
+        if admission.schema_version != RECORD_V1 or admission.admission_mechanism_version != RECORD_V1:
+            raise ValueError("TaskStarted admission attribution is stale or unsupported")
+        if admission.command_id != self.command_id:
+            raise ValueError("TaskStarted admission attributes another Command")
+        if admission.organization_id != self.profile.organization_id:
+            raise ValueError("TaskStarted admission crosses Organization boundary")
+        if admission.initiating_actor_id != self.profile.worker_actor_id:
+            raise ValueError("TaskStarted must be initiated by the assigned Worker Actor")
+        required_lineage = {
+            admission.organization_genesis_reference,
+            admission.actor_identity_reference,
+            admission.invocation_proof_reference,
+            admission.admission_mechanism_reference,
+            *admission.authentication_evidence_references,
+        }
+        if not required_lineage.issubset(self.transition_evidence_references):
+            raise ValueError("TaskStarted lacks immutable admission integrity lineage")
 
     def _validate_authority(self) -> None:
         evidence = self.issuance_authority_evidence
@@ -642,31 +718,6 @@ class AtomicTaskTerminalTransitionProof:
         if None in required or not required.issubset(references):
             raise ValueError("paired terminal transition lacks canonical integrity lineage")
         object.__setattr__(self, "canonical_integrity_references", references)
-
-
-@dataclass(frozen=True, slots=True)
-class AcceptedDelegatedCapabilityExecutionEvidence:
-    """Historical execution lineage only; it performs no Task transition."""
-
-    command_id: CommandId
-    organization_id: OrganizationId
-    task_id: TaskId
-    worker_actor_id: ActorId
-    capability_id: CapabilityId
-    source_event_id: EventId
-    source_stream_position: int
-    integrity_reference: IntegrityReference
-    schema_version: RecordTypeVersion = RECORD_V1
-
-    def __post_init__(self) -> None:
-        for name, expected in (
-            ("command_id", CommandId), ("organization_id", OrganizationId),
-            ("task_id", TaskId), ("worker_actor_id", ActorId),
-            ("capability_id", CapabilityId), ("source_event_id", EventId),
-            ("integrity_reference", IntegrityReference), ("schema_version", RecordTypeVersion),
-        ):
-            require_type(getattr(self, name), expected, type(self).__name__, name)
-        require_positive(self.source_stream_position, type(self).__name__, "source_stream_position")
 
 
 _TASK_DENIAL_CODES = frozenset({

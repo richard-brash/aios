@@ -66,6 +66,15 @@ These records neither administer Grants nor authorize or
 execute a capability. Historical replay validates the recorded proof without
 calling its resolver or consulting mutable current state.
 
+Temporary Worker eligibility uses the immutable contracts in
+`aios_protocol.temporary_worker`. Enrollment preserves the existing Temporary
+Worker Actor identity and pins same-Organization Worker, Sponsor, source-Grant,
+purpose, and first-worker bounds. Closed transition claims and accepted proofs
+bind lifecycle revisions, prior transition evidence, Organization-stream and
+audit lineage, and terminal-Task evidence for completion. The pure evaluator
+port neither grants authority nor performs identity lookup, governance,
+persistence, clock access, or capability execution.
+
 ## Constitutional bootstrap contracts
 
 Organization genesis uses `BootstrapEnvelope`, whose traffic mode is explicitly

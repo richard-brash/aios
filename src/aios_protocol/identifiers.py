@@ -54,6 +54,7 @@ class AuditRecordId(Identifier): pass
 class IntegrityReference(Identifier): pass
 class RoleId(Identifier): pass
 class RoleAssignmentId(Identifier): pass
+class TaskId(Identifier): pass
 class MissionId(Identifier): pass
 class PolicyId(Identifier): pass
 class GoalId(Identifier): pass
@@ -70,6 +71,6 @@ IDENTIFIER_TYPES = (
     ScheduleId, ScheduleInstanceId, SubscriptionId, ApprovalId,
     ApprovalUseId, AuthorityGrantId, BudgetId, CapabilityId, DecisionId, ResourceId,
     MemoryRecordId, AuditRecordId, IntegrityReference, RoleId,
-    RoleAssignmentId, MissionId, PolicyId, GoalId, IncidentId, ToolId, ExternalOperationId,
+    RoleAssignmentId, TaskId, MissionId, PolicyId, GoalId, IncidentId, ToolId, ExternalOperationId,
     ProjectionId, CheckpointId,
 )

@@ -233,6 +233,49 @@ acceptance, `TaskAssigned` binds the enrollment and Role Assignment, and
 Invalid transitions reject without lifecycle mutation. A failed Task is
 terminal. Retry is a new Task with explicit causation.
 
+### 5.1 Executable constrained Task contract
+
+The Milestone 3 protocol profile pins the existing `task_id`, one concrete Work
+Root, canonical Organization, issuer and Temporary Worker Actors, active
+enrollment and Role Assignment evidence, exact active Role revision, source
+Authority Grant evidence, finite canonical exact capability identifiers,
+governed input integrity, purpose, expected output, acceptance criteria, risk,
+reversibility, and one independently identified Task Budget. The Budget retains
+the source Resource lineage, has dimension and unit
+`accepted_delegated_capability_execution`, limit and maximum accepted execution
+count one, and begins unconsumed. These immutable facts administer neither the
+Grant nor the Budget and confer no authority independently of the source Grant.
+
+The closed first-worker transitions are `TaskProposed`, `TaskAccepted`,
+`TaskAssigned`, `TaskStarted`, `TaskCompleted`, `TaskFailed`, and
+`TaskCancelled`, with the lifecycle above. Every accepted transition advances
+the Task revision exactly once and pins its prior transition Event,
+Organization-stream position, integrity, audit, Command, and evaluation
+lineage. Proposal and acceptance require source-Grant attenuation bound to the
+exact Command and Task scope. Assignment and start require current immutable
+active enrollment and exact active Role Assignment evidence in the same
+Organization. Only the accepted `in_progress` state qualifies later delegated
+execution; an accepted delegated execution reference does not itself transition
+the Task.
+
+A terminal Task transition is not an independently accepted protocol result.
+For the one-Task enrollment it is accepted only as one atomic paired proof
+containing the terminal Task Event followed immediately by `WorkerCompleted`.
+Both components MUST bind the same Organization, Worker Actor, exact Task,
+Command, audit identity, and atomic append reference. The Worker completion
+claim MUST reuse the progressive enrollment-to-Task assignment evidence and
+cite the terminal Task Event identity, position, and integrity reference. The
+Task terminal Event precedes `WorkerCompleted` contiguously in that append.
+Missing, mismatched, reordered, or incomplete paired evidence fails closed and
+records neither transition. Terminality changes neither Role Assignment nor
+source Authority Grant state.
+
+Accepted proofs retain all evidence required for deterministic historical
+replay without mutable identity, enrollment, Role, Assignment, Grant, Policy,
+Budget, clock, persistence, or external lookups. The pure evaluator boundary
+performs no append, capability execution, Resource consumption, lifecycle
+mutation, or other effect.
+
 ## 6. Authority derivation and attenuation
 
 The source Authority Grant is the sole permission source. Every dimension must

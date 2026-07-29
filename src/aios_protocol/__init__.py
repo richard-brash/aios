@@ -6,7 +6,7 @@ inspection. Protocol records remain in focused submodules to keep boundaries cle
 
 from . import (
     admission, append, approvals, audit, authority, bootstrap, commands, comparison, dispositions,
-    envelope, events, identifiers, memory, operations, presence, projections,
+    envelope, events, governed_task, identifiers, memory, operations, presence, projections,
     reason_codes, reconciliation, replay, resources, role_assignment, schedules, subscriptions,
     temporary_worker,
     tools, validation, versions,
@@ -14,7 +14,7 @@ from . import (
 
 __all__ = [
     "admission", "append", "approvals", "audit", "authority", "bootstrap", "commands", "comparison",
-    "dispositions", "envelope", "events", "identifiers", "memory",
+    "dispositions", "envelope", "events", "governed_task", "identifiers", "memory",
     "operations", "presence", "projections", "reason_codes",
     "reconciliation", "replay", "resources", "role_assignment", "schedules", "subscriptions",
     "temporary_worker",

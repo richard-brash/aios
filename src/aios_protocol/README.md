@@ -86,6 +86,16 @@ audit, integrity, and condition evidence for history-only replay. The records
 establish eligibility only; they contain no Task mutation or capability
 permission.
 
+The constrained first-worker Task uses the immutable contracts in
+`aios_protocol.governed_task`. Its profile pins one Work Root, exact Actor,
+enrollment, Role Assignment, Role, source-Grant, capability, governed-input,
+and one-execution Budget scope. Closed transition claims and proofs preserve
+Task revision, Organization-stream, audit, and integrity lineage. Terminal
+Task acceptance is represented only by an atomic paired proof whose immediately
+ordered `WorkerCompleted` evidence shares the Command, audit, and append
+boundary. These records perform no persistence, capability execution, Resource
+consumption, or lifecycle mutation.
+
 ## Constitutional bootstrap contracts
 
 Organization genesis uses `BootstrapEnvelope`, whose traffic mode is explicitly

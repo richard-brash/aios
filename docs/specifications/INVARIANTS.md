@@ -125,6 +125,14 @@ Suspension, expiry, revocation, termination, or loss of delegation authority by 
 
 **Rationale:** A worker cannot outlive the accountable and authoritative basis on which it was created.
 
+### INV-015A — Governed Task delegation attenuates source authority
+
+Every consequential Temporary Worker capability execution references one accepted Task and one active source Authority Grant for that Actor. The Task's Organization, assignee, purpose, exact capability set, affected Resources, Resource ceiling, risk, Approval conditions, completion condition, and delegation rights MUST be equal to or narrower than the Grant. Enrollment, Role Assignment, Task acceptance, capability availability, and Approval are independently necessary where applicable but are never authority by themselves. Missing or incomparable scope fails closed.
+
+For the Milestone 3 first-worker profile, the Temporary Worker enrollment shares the Actor's `actor_id`, is limited to one active Role Assignment, one source Grant, and one Task, and permits exactly one accepted delegated capability execution. The terminal Task outcome satisfies the enrollment completion condition. This profile creates neither a separate Worker identity nor a Work Item entity.
+
+**Rationale:** The first Worker requires a bounded executable envelope without weakening constitutional Grant lineage or duplicating Task and Actor identity.
+
 ## 5. Authority, decisions, and approvals
 
 ### INV-016 — Consequential action requires authority

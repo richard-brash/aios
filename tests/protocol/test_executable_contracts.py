@@ -201,7 +201,7 @@ class GovernanceStructureTests(unittest.TestCase):
         self.assertNotIn("consumed_amount", ReservationRequest.__dataclass_fields__)
 
     def test_27_resource_dimensions_are_independent(self):
-        self.assertEqual(len(ResourceDimension), 8)
+        self.assertEqual(len(ResourceDimension), 9)
         self.assertNotEqual(ResourceDimension.MONEY, ResourceDimension.COMPUTE)
 
     def test_28_due_observation_is_not_command(self):

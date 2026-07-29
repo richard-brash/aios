@@ -56,6 +56,8 @@ Every Event MUST conform to the common envelope and its versioned Event-type sch
 
 Events MAY also record participating, proposing, recommending, deciding, approving, reviewing, and technically recording Actor identifiers; a Governing Body; and individually attributable votes, recusals, or dispositions. Consequential Events MUST distinguish the accountable decider from the approver and technical initiator. They MUST additionally reference the Work Root, Task when applicable, Authority Grant, relevant Policy versions, Decision, required Approvals, affected entities, Tool invocations, cost, reversibility status, and result evidence. Protected values MAY be represented by integrity-preserving restricted references.
 
+For Milestone 3 governed Task delegation, accepted lifecycle and capability-execution history MUST additionally preserve the Temporary Worker Actor/enrollment reference, qualifying Role Assignment, pinned source Authority Grant evidence, exact Task capability scope, deterministic Resource ceiling and consumption, and Task execution/outcome lineage. These facts remain in the applicable envelope, audit, relationship, Resource, or domain Event contract rather than being redundantly copied into every payload. One atomic accepted delegated execution records the common accepted disposition, capability domain Event or Events, Task execution reference, ceiling consumption, and audit linkage. Task completion, failure, or cancellation is a separate accepted execution and atomically records the terminal Task Event with `WorkerCompleted` for the one-Task profile.
+
 ### Epistemic status
 
 `epistemic_status` describes the basis on which an Event's assertion is recorded:

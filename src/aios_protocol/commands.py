@@ -87,6 +87,7 @@ class ResourceDimension(str, Enum):
     HUMAN_ATTENTION = "human_attention"
     CREDENTIALS = "credentials"
     REPUTATION_EXPOSURE = "reputation_exposure"
+    ACCEPTED_DELEGATED_CAPABILITY_EXECUTION = "accepted_delegated_capability_execution"
 
 
 @dataclass(frozen=True, slots=True)

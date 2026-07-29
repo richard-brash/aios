@@ -68,6 +68,63 @@ ineligible for Task acceptance or execution. Enrollment conveys eligibility,
 never authority. Suspension, revocation, completion, or archival prevents new
 activity without erasing Actor identity or accepted history.
 
+### 3.1 Executable enrollment contract
+
+The Milestone 3 protocol represents enrollment with the existing `actor_id`;
+it introduces no Worker or enrollment identity. Immutable Actor evidence pins
+the Actor kind, identity state, Organization, entity revision, authoritative
+Event position, and integrity reference for both the Temporary Worker and its
+Sponsor. The Sponsor MUST be an active Human or Employee in the same
+Organization, and the Worker Actor MUST be active with
+`actor_kind=temporary_worker`.
+
+The enrollment profile pins its bounded purpose, source Authority Grant and
+evidence reference, and the closed first-worker limits: at most one active Role
+Assignment, one Task, and one accepted delegated capability execution; Task
+terminality is the completion condition; redelegation and sub-worker creation
+are prohibited. These limits establish eligibility constraints only. The
+authoritative Role Assignment and Task records establish their own identities
+and state in later transitions; enrollment does not duplicate inverse
+relationship collections or confer permission.
+
+The supported first-worker enrollment transitions are the existing semantic
+transitions `WorkerRequested`, `WorkerSpawned`, `WorkerRequestRevoked`,
+`WorkerSuspended`, `WorkerRestored`, `WorkerCompleted`, `WorkerRevoked`, and
+`WorkerArchived`. The protocol claim fixes prior and resulting state and the
+expected enrollment revision. Every transition after request also pins the
+prior transition Event and its integrity evidence. Request begins at
+nonexistent revision zero; every accepted transition advances the revision
+exactly once. Request, activation, and restoration require an active immutable source-Grant proof
+bound to that transition Command, Organization, Actor, Sponsor, purpose, and
+evaluation point. Completion requires recorded Task-terminal evidence at the
+accepted-execution boundary; the contract performs no ambient-time read.
+`WorkerExpired` remains part of the general Temporary Worker lifecycle but is
+unsupported by this Task-terminal first-worker profile.
+
+Task identity is bound progressively rather than required by
+`WorkerRequested`. Before `WorkerCompleted`, immutable relationship evidence
+MUST identify the active enrollment Event and integrity evidence under which
+the Task was assigned, followed by the authoritative Task-assignment Event,
+Organization-stream position, and integrity evidence. Assignment and terminal
+evidence MUST name the same canonical Organization, Temporary Worker
+`actor_id`, and exact `task_id`; the activation, assignment, and terminal
+positions MUST be strictly ordered. A terminal Task for the same Actor that is
+not the Task bound by that assignment evidence cannot complete the enrollment.
+
+Accepted transition proof contains the complete immutable claim, resulting
+revision, authoritative Event identity and Organization-stream position,
+audit identity, and canonical evidence references. Replay relies on that
+recorded evidence and MUST NOT reacquire identity, Grant, Policy, or current
+lifecycle state. Later suspension, revocation, completion, or archival governs
+new actions only and cannot rewrite an accepted historical decision.
+
+Malformed, unsupported, stale, contradictory, cross-Organization, wrong-kind,
+wrong-Sponsor, inactive-identity, insufficient-Grant, prohibited-delegation,
+and invalid-transition claims fail closed through a typed denial. The
+capability-neutral evaluator consumes immutable evidence and has no credential,
+persistence, clock, external lookup, policy-execution, or capability-handler
+responsibility.
+
 ## 4. Role Assignment qualification
 
 One canonical Role Assignment binds the Temporary Worker Actor to one active

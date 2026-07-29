@@ -8,6 +8,7 @@ from . import (
     admission, append, approvals, audit, authority, bootstrap, commands, comparison, dispositions,
     envelope, events, identifiers, memory, operations, presence, projections,
     reason_codes, reconciliation, replay, resources, schedules, subscriptions,
+    temporary_worker,
     tools, validation, versions,
 )
 
@@ -16,5 +17,6 @@ __all__ = [
     "dispositions", "envelope", "events", "identifiers", "memory",
     "operations", "presence", "projections", "reason_codes",
     "reconciliation", "replay", "resources", "schedules", "subscriptions",
+    "temporary_worker",
     "tools", "validation", "versions",
 ]

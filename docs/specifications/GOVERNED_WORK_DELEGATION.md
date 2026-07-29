@@ -101,6 +101,16 @@ accepted-execution boundary; the contract performs no ambient-time read.
 `WorkerExpired` remains part of the general Temporary Worker lifecycle but is
 unsupported by this Task-terminal first-worker profile.
 
+Task identity is bound progressively rather than required by
+`WorkerRequested`. Before `WorkerCompleted`, immutable relationship evidence
+MUST identify the active enrollment Event and integrity evidence under which
+the Task was assigned, followed by the authoritative Task-assignment Event,
+Organization-stream position, and integrity evidence. Assignment and terminal
+evidence MUST name the same canonical Organization, Temporary Worker
+`actor_id`, and exact `task_id`; the activation, assignment, and terminal
+positions MUST be strictly ordered. A terminal Task for the same Actor that is
+not the Task bound by that assignment evidence cannot complete the enrollment.
+
 Accepted transition proof contains the complete immutable claim, resulting
 revision, authoritative Event identity and Organization-stream position,
 audit identity, and canonical evidence references. Replay relies on that

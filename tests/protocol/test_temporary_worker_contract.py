@@ -16,6 +16,7 @@ from aios_protocol.identifiers import (
     IntegrityReference, OrganizationId, ResourceId, TaskId,
 )
 from aios_protocol.reason_codes import ReasonCode
+from aios_protocol.validation import StructuralValidationError
 from aios_protocol.temporary_worker import (
     ActorEnrollmentEvidence,
     ActorIdentityState,
@@ -27,6 +28,7 @@ from aios_protocol.temporary_worker import (
     TemporaryWorkerEnrollmentResolution,
     TemporaryWorkerGate,
     TemporaryWorkerLifecycle,
+    TemporaryWorkerTaskAssignmentEvidence,
     TemporaryWorkerTaskTerminalEvidence,
     TemporaryWorkerTaskTerminalState,
     TemporaryWorkerTransition,
@@ -133,11 +135,42 @@ def claim(**changes) -> TemporaryWorkerTransitionClaim:
         prior_transition_integrity_reference=None,
         evaluation_time=T,
         source_grant_proof=grant_proof(command_id),
+        task_assignment_evidence=None,
         task_terminal_evidence=None,
         transition_evidence_references=(IntegrityReference("evidence:request"),),
     )
     values.update(changes)
     return TemporaryWorkerTransitionClaim(**values)
+
+
+def assignment_evidence(**changes) -> TemporaryWorkerTaskAssignmentEvidence:
+    values = dict(
+        organization_id=OrganizationId("org:alpha"),
+        worker_actor_id=ActorId("actor:worker"),
+        task_id=TaskId("task:first-worker"),
+        enrollment_activation_event_id=EventId("event:worker-active"),
+        enrollment_activation_stream_position=12,
+        enrollment_activation_integrity_reference=IntegrityReference("integrity:worker-active"),
+        assignment_event_id=EventId("event:task-assigned"),
+        assignment_stream_position=20,
+        assignment_integrity_reference=IntegrityReference("integrity:task-assigned"),
+    )
+    values.update(changes)
+    return TemporaryWorkerTaskAssignmentEvidence(**values)
+
+
+def terminal_evidence(**changes) -> TemporaryWorkerTaskTerminalEvidence:
+    values = dict(
+        organization_id=OrganizationId("org:alpha"),
+        worker_actor_id=ActorId("actor:worker"),
+        task_id=TaskId("task:first-worker"),
+        terminal_state=TemporaryWorkerTaskTerminalState.COMPLETED,
+        source_event_id=EventId("event:task-completed"),
+        source_stream_position=29,
+        integrity_reference=IntegrityReference("integrity:task-completed"),
+    )
+    values.update(changes)
+    return TemporaryWorkerTaskTerminalEvidence(**values)
 
 
 class TemporaryWorkerContractTests(unittest.TestCase):
@@ -146,6 +179,7 @@ class TemporaryWorkerContractTests(unittest.TestCase):
         self.assertEqual(record.actor_id, ActorId("actor:worker"))
         self.assertIs(record.worker_actor.actor_kind, ActorKind.TEMPORARY_WORKER)
         self.assertNotIn("worker_id", {field.name for field in dataclasses.fields(record)})
+        self.assertNotIn("task_id", {field.name for field in dataclasses.fields(record)})
 
     def test_worker_sponsor_and_organization_are_explicit_and_consistent(self):
         record = enrollment()
@@ -222,16 +256,12 @@ class TemporaryWorkerContractTests(unittest.TestCase):
                         None if prior is None else IntegrityReference("integrity:prior-worker-state")
                     ),
                     source_grant_proof=grant_proof(command_id) if needs_grant else None,
+                    task_assignment_evidence=(
+                        assignment_evidence()
+                        if transition is TemporaryWorkerTransition.COMPLETE else None
+                    ),
                     task_terminal_evidence=(
-                        TemporaryWorkerTaskTerminalEvidence(
-                            OrganizationId("org:alpha"),
-                            ActorId("actor:worker"),
-                            TaskId("task:first-worker"),
-                            TemporaryWorkerTaskTerminalState.COMPLETED,
-                            EventId("event:task-completed"),
-                            29,
-                            IntegrityReference("integrity:task-completed"),
-                        )
+                        terminal_evidence()
                         if transition is TemporaryWorkerTransition.COMPLETE else None
                     ),
                 )
@@ -266,21 +296,15 @@ class TemporaryWorkerContractTests(unittest.TestCase):
                 prior_transition_event_id=EventId("event:worker-active"),
                 prior_transition_integrity_reference=IntegrityReference("integrity:worker-active"),
                 source_grant_proof=grant_proof(),
-                task_terminal_evidence=TemporaryWorkerTaskTerminalEvidence(
-                    OrganizationId("org:alpha"), ActorId("actor:worker"),
-                    TaskId("task:first-worker"),
-                    TemporaryWorkerTaskTerminalState.COMPLETED,
-                    EventId("event:task-completed"), 29,
-                    IntegrityReference("integrity:task-completed"),
-                ),
+                task_assignment_evidence=assignment_evidence(),
+                task_terminal_evidence=terminal_evidence(),
             )
 
     def test_completion_requires_same_organization_actor_terminal_task_evidence(self):
-        terminal = TemporaryWorkerTaskTerminalEvidence(
-            OrganizationId("org:alpha"), ActorId("actor:worker"),
-            TaskId("task:first-worker"), TemporaryWorkerTaskTerminalState.FAILED,
-            EventId("event:task-failed"), 29,
-            IntegrityReference("integrity:task-failed"),
+        terminal = terminal_evidence(
+            terminal_state=TemporaryWorkerTaskTerminalState.FAILED,
+            source_event_id=EventId("event:task-failed"),
+            integrity_reference=IntegrityReference("integrity:task-failed"),
         )
         made = claim(
             transition=TemporaryWorkerTransition.COMPLETE,
@@ -290,6 +314,7 @@ class TemporaryWorkerContractTests(unittest.TestCase):
             prior_transition_event_id=EventId("event:worker-active"),
             prior_transition_integrity_reference=IntegrityReference("integrity:worker-active"),
             source_grant_proof=None,
+            task_assignment_evidence=assignment_evidence(),
             task_terminal_evidence=terminal,
         )
         self.assertIs(
@@ -310,6 +335,107 @@ class TemporaryWorkerContractTests(unittest.TestCase):
                     terminal, worker_actor_id=ActorId("actor:other"),
                 ),
             )
+
+    def test_completion_rejects_terminal_evidence_for_another_assigned_task(self):
+        with self.assertRaisesRegex(ValueError, "terminal Task differs"):
+            claim(
+                transition=TemporaryWorkerTransition.COMPLETE,
+                prior_state=TemporaryWorkerLifecycle.ACTIVE,
+                resulting_state=TemporaryWorkerLifecycle.COMPLETED,
+                expected_entity_revision=2,
+                prior_transition_event_id=EventId("event:worker-active"),
+                prior_transition_integrity_reference=IntegrityReference("integrity:worker-active"),
+                source_grant_proof=None,
+                task_assignment_evidence=assignment_evidence(),
+                task_terminal_evidence=terminal_evidence(task_id=TaskId("task:other")),
+            )
+
+    def test_completion_rejects_assignment_for_another_worker_or_organization(self):
+        for changed in (
+            assignment_evidence(worker_actor_id=ActorId("actor:other")),
+            assignment_evidence(organization_id=OrganizationId("org:other")),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                claim(
+                    transition=TemporaryWorkerTransition.COMPLETE,
+                    prior_state=TemporaryWorkerLifecycle.ACTIVE,
+                    resulting_state=TemporaryWorkerLifecycle.COMPLETED,
+                    expected_entity_revision=2,
+                    prior_transition_event_id=EventId("event:worker-active"),
+                    prior_transition_integrity_reference=IntegrityReference("integrity:worker-active"),
+                    source_grant_proof=None,
+                    task_assignment_evidence=changed,
+                    task_terminal_evidence=terminal_evidence(),
+                )
+
+    def test_completion_rejects_terminal_outcome_before_or_at_assignment(self):
+        for position in (19, 20):
+            with self.subTest(position=position), self.assertRaisesRegex(
+                ValueError, "terminal Task outcome must follow",
+            ):
+                claim(
+                    transition=TemporaryWorkerTransition.COMPLETE,
+                    prior_state=TemporaryWorkerLifecycle.ACTIVE,
+                    resulting_state=TemporaryWorkerLifecycle.COMPLETED,
+                    expected_entity_revision=2,
+                    prior_transition_event_id=EventId("event:worker-active"),
+                    prior_transition_integrity_reference=IntegrityReference("integrity:worker-active"),
+                    source_grant_proof=None,
+                    task_assignment_evidence=assignment_evidence(),
+                    task_terminal_evidence=terminal_evidence(source_stream_position=position),
+                )
+        with self.assertRaisesRegex(ValueError, "distinct Events"):
+            claim(
+                transition=TemporaryWorkerTransition.COMPLETE,
+                prior_state=TemporaryWorkerLifecycle.ACTIVE,
+                resulting_state=TemporaryWorkerLifecycle.COMPLETED,
+                expected_entity_revision=2,
+                prior_transition_event_id=EventId("event:worker-active"),
+                prior_transition_integrity_reference=IntegrityReference("integrity:worker-active"),
+                source_grant_proof=None,
+                task_assignment_evidence=assignment_evidence(),
+                task_terminal_evidence=terminal_evidence(
+                    source_event_id=EventId("event:task-assigned"),
+                ),
+            )
+
+    def test_assignment_lineage_is_required_well_formed_and_ordered(self):
+        with self.assertRaises(StructuralValidationError):
+            assignment_evidence(assignment_integrity_reference=None)
+        with self.assertRaises(ValueError):
+            assignment_evidence(assignment_stream_position=12)
+        with self.assertRaises(ValueError):
+            assignment_evidence(assignment_event_id=EventId("event:worker-active"))
+        with self.assertRaises(StructuralValidationError):
+            claim(
+                transition=TemporaryWorkerTransition.COMPLETE,
+                prior_state=TemporaryWorkerLifecycle.ACTIVE,
+                resulting_state=TemporaryWorkerLifecycle.COMPLETED,
+                expected_entity_revision=2,
+                prior_transition_event_id=EventId("event:worker-active"),
+                prior_transition_integrity_reference=IntegrityReference("integrity:worker-active"),
+                source_grant_proof=None,
+                task_assignment_evidence=None,
+                task_terminal_evidence=terminal_evidence(),
+            )
+
+    def test_non_completion_transition_rejects_task_relationship_evidence(self):
+        with self.assertRaisesRegex(ValueError, "non-completion transition"):
+            claim(task_assignment_evidence=assignment_evidence())
+        with self.assertRaisesRegex(ValueError, "non-completion transition"):
+            claim(task_terminal_evidence=terminal_evidence())
+
+    def test_assignment_evidence_is_immutable_comparable_and_effect_free(self):
+        evidence = assignment_evidence()
+        rebuilt = TemporaryWorkerTaskAssignmentEvidence(**{
+            field.name: getattr(evidence, field.name)
+            for field in dataclasses.fields(TemporaryWorkerTaskAssignmentEvidence)
+        })
+        self.assertEqual(rebuilt, evidence)
+        self.assertFalse(hasattr(evidence, "repository"))
+        self.assertFalse(hasattr(evidence, "clock"))
+        with self.assertRaises(dataclasses.FrozenInstanceError):
+            evidence.task_id = TaskId("task:changed")
 
     def test_source_grant_is_exact_but_does_not_make_enrollment_authority(self):
         mismatches = (

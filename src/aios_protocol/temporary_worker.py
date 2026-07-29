@@ -239,6 +239,46 @@ class TemporaryWorkerTaskTerminalEvidence:
             raise TypeError("source_stream_position must be int")
 
 
+@dataclass(frozen=True, slots=True)
+class TemporaryWorkerTaskAssignmentEvidence:
+    """Authoritative lineage from an active enrollment to its one assigned Task."""
+
+    organization_id: OrganizationId
+    worker_actor_id: ActorId
+    task_id: TaskId
+    enrollment_activation_event_id: EventId
+    enrollment_activation_stream_position: int
+    enrollment_activation_integrity_reference: IntegrityReference
+    assignment_event_id: EventId
+    assignment_stream_position: int
+    assignment_integrity_reference: IntegrityReference
+    schema_version: RecordTypeVersion = RECORD_V1
+
+    def __post_init__(self) -> None:
+        for name, expected in (
+            ("organization_id", OrganizationId),
+            ("worker_actor_id", ActorId),
+            ("task_id", TaskId),
+            ("enrollment_activation_event_id", EventId),
+            ("enrollment_activation_integrity_reference", IntegrityReference),
+            ("assignment_event_id", EventId),
+            ("assignment_integrity_reference", IntegrityReference),
+            ("schema_version", RecordTypeVersion),
+        ):
+            require_type(getattr(self, name), expected, type(self).__name__, name)
+        for name in (
+            "enrollment_activation_stream_position", "assignment_stream_position",
+        ):
+            value = getattr(self, name)
+            require_positive(value, type(self).__name__, name)
+            if type(value) is not int:
+                raise TypeError(f"{name} must be int")
+        if self.enrollment_activation_event_id == self.assignment_event_id:
+            raise ValueError("enrollment activation and Task assignment require distinct Events")
+        if self.enrollment_activation_stream_position >= self.assignment_stream_position:
+            raise ValueError("Task assignment must follow active enrollment evidence")
+
+
 _TRANSITIONS = {
     TemporaryWorkerTransition.REQUEST: (None, TemporaryWorkerLifecycle.REQUESTED),
     TemporaryWorkerTransition.ACTIVATE: (
@@ -281,6 +321,7 @@ class TemporaryWorkerTransitionClaim:
     prior_transition_integrity_reference: IntegrityReference | None
     evaluation_time: datetime
     source_grant_proof: SourceAuthorityGrantProof | None
+    task_assignment_evidence: TemporaryWorkerTaskAssignmentEvidence | None
     task_terminal_evidence: TemporaryWorkerTaskTerminalEvidence | None
     transition_evidence_references: tuple[IntegrityReference, ...]
     schema_version: RecordTypeVersion = RECORD_V1
@@ -345,15 +386,34 @@ class TemporaryWorkerTransitionClaim:
             raise ValueError("transition does not accept unrelated current Grant evidence")
         if self.transition is TemporaryWorkerTransition.COMPLETE:
             require_type(
+                self.task_assignment_evidence, TemporaryWorkerTaskAssignmentEvidence,
+                type(self).__name__, "task_assignment_evidence",
+            )
+            require_type(
                 self.task_terminal_evidence, TemporaryWorkerTaskTerminalEvidence,
                 type(self).__name__, "task_terminal_evidence",
             )
+            assignment = self.task_assignment_evidence
+            terminal = self.task_terminal_evidence
+            if assignment.organization_id != self.enrollment.organization_id:
+                raise ValueError("Task assignment evidence crosses Organization boundary")
+            if assignment.worker_actor_id != self.enrollment.actor_id:
+                raise ValueError("Task assignment evidence names another Actor")
             if self.task_terminal_evidence.organization_id != self.enrollment.organization_id:
                 raise ValueError("terminal Task evidence crosses Organization boundary")
             if self.task_terminal_evidence.worker_actor_id != self.enrollment.actor_id:
                 raise ValueError("terminal Task evidence names another Actor")
-        elif self.task_terminal_evidence is not None:
-            raise ValueError("non-completion transition cannot claim terminal Task evidence")
+            if assignment.task_id != terminal.task_id:
+                raise ValueError("terminal Task differs from the enrolled Task assignment")
+            if assignment.assignment_event_id == terminal.source_event_id:
+                raise ValueError("Task assignment and terminal outcome require distinct Events")
+            if assignment.assignment_stream_position >= terminal.source_stream_position:
+                raise ValueError("terminal Task outcome must follow Task assignment")
+        elif (
+            self.task_assignment_evidence is not None
+            or self.task_terminal_evidence is not None
+        ):
+            raise ValueError("non-completion transition cannot claim Task relationship evidence")
         object.__setattr__(self, "transition_evidence_references", _canonical_evidence(
             self.transition_evidence_references,
             record_type=type(self).__name__,

@@ -154,6 +154,46 @@ same Organization, an eligible assigner, duty scope, and a review or completion
 condition. Termination means expiry or revocation for new qualification;
 archival preserves the relationship and its historical use.
 
+### 4.1 Executable Role Assignment contract
+
+The Milestone 3 protocol preserves the canonical `role_assignment_id`,
+Temporary Worker `actor_id`, and `role_id`; it introduces no Worker,
+employment, credential, or principal identity. The immutable assignment
+profile pins one Organization, assigner, exact qualifying Role revision,
+explicit `effective_at`, nonempty duty scope, review or completion condition,
+condition integrity, and canonical evidence. It establishes occupational
+eligibility only and contains no capability permission.
+
+Current qualification evidence is the conjunction of an accepted active
+Temporary Worker enrollment proof, an active exact Role revision, an active
+same-Organization Human or Employee assigner who is the first-worker Sponsor,
+and immutable assigner-authority evidence for the exact Worker Actor, Role,
+Command, and evaluation point. The proof cites the applicable active Authority
+Grant and affirmative assignment disposition;
+this contract does not create a new capability identifier. Missing, inactive,
+stale, wrong-Actor, wrong-Role, cross-Organization, or insufficient evidence fails
+closed. Proposal, activation, and restoration require this current evidence;
+suspension and termination preserve the evidence originally accepted.
+
+The closed transitions are `RoleAssignmentProposed`,
+`RoleAssignmentActivated`, `RoleAssignmentSuspended`,
+`RoleAssignmentRestored`, `RoleAssignmentExpired`,
+`RoleAssignmentRevoked`, and `RoleAssignmentArchived` with the lifecycle
+defined above. Proposal from nonexistence begins at revision zero, and every
+accepted transition advances the relationship revision exactly once and pins
+the prior transition Event, Organization-stream position, and integrity
+evidence. Expiry requires supplied immutable condition evidence whose Event
+follows the prior transition and whose satisfaction time is no later than the
+explicit evaluation time; the contract reads no clock.
+
+Accepted proof retains the complete immutable claim, resulting revision,
+authoritative Event and Organization-stream position, audit identity, and
+canonical integrity evidence. Replay validates those recorded facts without
+identity, enrollment, Role, Grant, Policy, persistence, or time lookups. A
+suspended, expired, revoked, or archived assignment cannot qualify new Task
+acceptance or delegated execution. Those transitions neither cancel a Task,
+infer a Task terminal state, nor rewrite historical accepted execution.
+
 ## 5. Constrained Task contract
 
 The Milestone 3 Task is the existing Task with these pinned facts at acceptance:

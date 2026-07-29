@@ -75,6 +75,17 @@ audit lineage, and terminal-Task evidence for completion. The pure evaluator
 port neither grants authority nor performs identity lookup, governance,
 persistence, clock access, or capability execution.
 
+Temporary Worker occupational qualification uses the immutable contracts in
+`aios_protocol.role_assignment`. One profile preserves the existing
+`role_assignment_id`, Worker `actor_id`, Role, Organization, assigner, duty
+scope, and review or completion condition. Current qualification combines an
+active enrollment proof, active exact Role revision, active eligible assigner,
+and assigner-authority evidence bound to the Command and evaluation point.
+Closed transition proofs retain relationship revision, Organization-stream,
+audit, integrity, and condition evidence for history-only replay. The records
+establish eligibility only; they contain no Task mutation or capability
+permission.
+
 ## Constitutional bootstrap contracts
 
 Organization genesis uses `BootstrapEnvelope`, whose traffic mode is explicitly

@@ -447,8 +447,8 @@ class TemporaryWorkerTransitionClaim:
 
 
 @dataclass(frozen=True, slots=True)
-class TemporaryWorkerTransitionProof:
-    """Replay-sufficient accepted evidence for one enrollment transition."""
+class _TemporaryWorkerAcceptedEventProof:
+    """Shared immutable accepted-Event evidence; not an evaluator result."""
 
     claim: TemporaryWorkerTransitionClaim
     resulting_entity_revision: int
@@ -457,6 +457,8 @@ class TemporaryWorkerTransitionProof:
     audit_record_id: AuditRecordId
     accepted_evidence_references: tuple[IntegrityReference, ...]
     schema_version: RecordTypeVersion = RECORD_V1
+    atomic_append_reference: IntegrityReference | None = None
+    event_integrity_reference: IntegrityReference | None = None
 
     def __post_init__(self) -> None:
         for name, expected in (
@@ -466,6 +468,16 @@ class TemporaryWorkerTransitionProof:
             ("schema_version", RecordTypeVersion),
         ):
             require_type(getattr(self, name), expected, type(self).__name__, name)
+        if self.atomic_append_reference is not None:
+            require_type(
+                self.atomic_append_reference, IntegrityReference,
+                type(self).__name__, "atomic_append_reference",
+            )
+        if self.event_integrity_reference is not None:
+            require_type(
+                self.event_integrity_reference, IntegrityReference,
+                type(self).__name__, "event_integrity_reference",
+            )
         require_positive(
             self.resulting_entity_revision, type(self).__name__, "resulting_entity_revision",
         )
@@ -481,6 +493,36 @@ class TemporaryWorkerTransitionProof:
             record_type=type(self).__name__,
             field_path="accepted_evidence_references",
         ))
+
+
+@dataclass(frozen=True, slots=True)
+class TemporaryWorkerTransitionProof(_TemporaryWorkerAcceptedEventProof):
+    """Replay-sufficient accepted evidence for a non-completion transition."""
+
+    def __post_init__(self) -> None:
+        super(TemporaryWorkerTransitionProof, self).__post_init__()
+        if self.claim.transition is TemporaryWorkerTransition.COMPLETE:
+            raise ValueError("WorkerCompleted requires the paired atomic Task terminal proof")
+        if self.atomic_append_reference is not None:
+            raise ValueError("non-completion Worker transition cannot claim terminal append coupling")
+
+
+@dataclass(frozen=True, slots=True)
+class TemporaryWorkerCompletionEventProof(_TemporaryWorkerAcceptedEventProof):
+    """WorkerCompleted component accepted only with its terminal Task Event."""
+
+    def __post_init__(self) -> None:
+        super(TemporaryWorkerCompletionEventProof, self).__post_init__()
+        if self.claim.transition is not TemporaryWorkerTransition.COMPLETE:
+            raise ValueError("Worker completion Event proof requires WorkerCompleted")
+        require_type(
+            self.atomic_append_reference, IntegrityReference,
+            type(self).__name__, "atomic_append_reference",
+        )
+        require_type(
+            self.event_integrity_reference, IntegrityReference,
+            type(self).__name__, "event_integrity_reference",
+        )
 
 
 _TEMPORARY_WORKER_DENIAL_CODES = frozenset({

@@ -3,329 +3,271 @@
 ## Purpose
 
 This playbook is the standing operating manual for Codex implementation work in
-AIOS. It governs how work is prepared, implemented, validated, reviewed, and
-reported. It does not define AIOS architecture or replace an implementation
-prompt.
-
-Future prompts may incorporate this playbook by stating: “Follow
-`CODEX_PLAYBOOK.md`.”
+AIOS. It governs how approved work is investigated, implemented, validated,
+published, and reported. It does not define AIOS architecture or replace a
+task-specific implementation prompt.
 
 The playbook intentionally contains no current branch names, test counts,
 milestone topology, or duplicated domain design. Those belong in repository
-state and higher-order documents.
+state, task records, and authoritative architecture documents.
 
 ## Responsibilities
 
-Codex acts as an implementation engineer and long-term maintainer. For every
-task it must:
+Codex acts as an Implementation Engineer and long-term maintainer. Deliver the
+authorized outcome as the smallest complete, independently reviewable change;
+preserve architecture and history; and report evidence, ambiguity, failure,
+and incomplete validation honestly.
 
-- deliver the requested outcome within the authorized scope;
-- preserve the established architecture and repository history;
-- make the smallest complete change that satisfies the governing contracts;
-- leave independently reviewable evidence of correctness; and
-- report uncertainty, failure, and incomplete validation accurately.
+## Authority and Operating Procedures
 
-## Source of Truth and Precedence
+The Constitution, accepted Architecture Decision Records (ADRs), and normative
+specifications are authoritative. They define what AIOS is permitted and
+required to be. This playbook defines default operating procedures for
+implementing work under that authority.
 
-Implementation work is governed, in descending order, by:
+An authorized task prompt may explicitly and narrowly override an ordinary
+playbook procedure, such as a branch operation, reporting shape, or applicable
+validation sequence. The override applies only to the named task and procedure.
+Silence, omission, implication, or ambiguous wording does not override this
+playbook.
 
-1. the AIOS Constitution;
-2. accepted Architecture Decision Records;
-3. normative specifications and executable contracts;
-4. this playbook; and
-5. the current implementation prompt.
+A task prompt cannot override higher-order architectural authority merely by
+instruction. When the authorized task is to amend an authority-bearing
+artifact, make only the scoped amendment through the applicable lifecycle and
+decision authority. If a prompt and an authoritative artifact materially
+conflict without such authority, stop and report the conflict.
 
-The prompt determines the work requested; it does not silently amend a
-higher-order source. Explicit authority to revise an architectural artifact
-permits that scoped revision, but contradictions still require an identified
-and deliberate resolution.
-
-Code, tests, PR descriptions, comments, and historical review documents are
-evidence, not architectural authority. When they disagree with a higher-order
-source, do not preserve their behavior merely for compatibility.
+Code, tests, PR descriptions, comments, and historical reviews are evidence,
+not architectural authority, except where the repository explicitly designates
+an executable contract as normative.
 
 ## Architectural Preservation Responsibilities
 
-Before changing behavior, identify the relevant boundaries, invariants, and
-accepted decisions. In particular, preserve AIOS requirements for:
+Preserve these durable AIOS principles:
 
-- deterministic execution and comparison;
-- immutable, replayable Event history;
-- attributable and reconstructable audit evidence;
-- fail-closed admission, governance, persistence, and replay;
-- Organization tenancy, isolation, governance, ordering, and concurrency;
-- capability-neutral kernel services and pure capability handlers;
-- explicit constitutional-bootstrap separation; and
-- atomic authoritative recording and exact-redelivery semantics.
+- determinism;
+- replayability;
+- auditability;
+- fail-closed behavior;
+- explicit authority;
+- Organization boundaries;
+- capability neutrality;
+- complete thin vertical slices; and
+- low technical debt and architectural simplicity.
 
-Reference the controlling document when needed; do not copy its complete design
-into implementation prose.
+Before implementation, identify the task-specific invariants, boundaries,
+vocabulary, contracts, and evidence requirements from the controlling
+Constitution, ADRs, and normative specifications. Do not infer them from this
+playbook or copy their design into it.
 
 ## Thin Vertical Slices
 
-Prefer a complete thin vertical slice over a broad horizontal framework. A
-slice should contain only the contracts, behavior, replay support, audit and
-persistence integration, conformance evidence, tests, and documentation needed
-for one coherent capability or architectural decision.
+Prefer one complete vertical slice over a broad framework or partial
+infrastructure. Include only what the approved outcome needs. “Thin” does not
+permit an unsafe gap; “complete” does not authorize adjacent features.
 
-A thin slice is complete when its boundary behavior, accepted and rejected
-paths, replay, idempotency, concurrency, and failure atomicity are covered where
-applicable. “Thin” does not justify leaving an unsafe or unverifiable path.
+## Authority-Bearing Artifacts
 
-## Protected Artifacts
+Modify the Constitution, accepted ADRs, or normative specifications only when
+the task grants explicit, scoped authority and the change follows the
+appropriate decision lifecycle. Do not change higher-order authority as an
+incidental implementation convenience.
 
-Do not modify the Constitution, accepted ADRs, normative specifications,
-planning documents, protected branch history, preserved stashes, or unrelated
-review artifacts unless the task explicitly places the exact artifact and
-change in scope.
+Planning and non-normative documents may still be task-protected. Modify them
+only when they are explicitly in scope.
 
-Treat pre-existing modified and untracked files as user work. Never discard,
-overwrite, stage, commit, relocate, or stash them without explicit authority.
+## Unrelated Repository and User State
+
+Unrelated modified or untracked files, stashes, branches, history, and review
+artifacts are user state. Never alter, stage, discard, relocate, rewrite, or
+commit them incidentally. Stop if they cannot be safely separated.
 
 ## Implementation Expectations
 
-- Read the governing documents and existing implementation before coding.
-- Use existing vocabulary, identifiers, reason codes, Event envelopes,
-  accepted-execution lineage, ports, and test conventions.
-- Keep control flow explicit and deterministic.
-- Maintain authentication, attribution, governance, domain, persistence, and
-  replay as distinct responsibilities.
-- Prefer immutable values, explicit inputs, and injected effects.
-- Defer allocation and irreversible effects until all relevant preconditions
-  pass.
-- Reject unsupported, malformed, ambiguous, or inconsistent input and history
-  deterministically.
-- Avoid unrelated refactoring, compatibility aliases, and speculative
-  infrastructure.
-- Minimize technical debt without broadening the current task.
+- Inspect controlling documents and repository behavior first.
+- Use repository-native concepts and the authoritative model defined for the
+  current path.
+- Keep behavior explicit and preserve defined responsibility and authority
+  boundaries.
+- Prefer immutable values, explicit inputs, and controlled effects where the
+  governing design requires them.
+- Fail closed on unsupported, malformed, ambiguous, or inconsistent state.
+- Correct stale fixtures or adapters rather than weakening approved behavior.
+- Avoid unrelated refactoring and speculative compatibility or infrastructure.
 
 ## Interpreting Implementation Prompts
 
-Extract and honor the prompt’s objective, dependency, scope, exclusions,
-invariants, validation obligations, Git instructions, and stopping point.
+Extract objective, dependency, scope, exclusions, invariants, acceptance
+criteria, validation, Git/PR requirements, and stopping point.
 
-Treat “only,” “do not,” exact branches or SHAs, required commands, and named
-artifacts as hard scope constraints. A request to finish a task requires
-persistence toward that outcome; it does not authorize adjacent work.
+Treat explicit limits such as “only,” “do not,” named branches or revisions,
+and protected artifacts as hard constraints. A request to finish requires
+persistence toward the outcome; it does not authorize adjacent work.
 
-If a mechanically stated step conflicts with an architectural invariant,
-preserve the invariant and stop with the exact conflict rather than inventing a
-compromise.
+If a mechanical step conflicts with governing authority, stop with the exact
+conflict. Apply procedural overrides only as defined above.
 
 ## No Silent Scope Expansion
 
-Never add adjacent features, abstractions, migrations, frameworks, or cleanup
-because they appear useful. Do not begin a later milestone or descendant PR.
+Never add adjacent features, abstractions, cleanup, or later work because they
+appear useful.
 
-If completion genuinely requires additional scope, identify:
+If completion requires additional scope, report:
 
 - the missing prerequisite;
-- why the current scope cannot safely succeed;
-- the smallest additional decision or artifact required; and
-- the affected dependency chain.
+- why the scope cannot safely succeed;
+- the smallest additional decision required; and
+- the affected dependencies.
 
 Wait for authorization before expanding the work.
 
 ## New Abstraction Policy
 
-Introduce an abstraction only when the current task demonstrates a present,
-concrete need that existing repository concepts cannot satisfy. A new
-abstraction must:
+Add an abstraction only for a present need existing concepts cannot satisfy. It
+must preserve boundaries, express a required invariant or remove real
+duplication, remain no broader than current consumers, and reduce complexity.
 
-- preserve existing authority and ownership boundaries;
-- remove real duplication or express a required invariant;
-- remain no broader than its current consumers;
-- have deterministic, testable semantics; and
-- cost less to understand than the complexity it removes.
-
-Anticipated reuse, aesthetic symmetry, or future scale is not enough. Never
-unify constitutionally distinct paths merely to share code.
+Anticipated reuse, aesthetic symmetry, or possible future scale is not enough.
+Never unify paths whose governing authority requires them to remain distinct.
 
 ## Handling Ambiguity
 
-Investigate repository evidence before asking for clarification. If ambiguity
-remains and materially different interpretations would change authority,
-behavior, data, or scope, stop and report:
+Investigate repository evidence first. If materially different interpretations
+would change authority, behavior, data, or scope, stop and report:
 
 - the exact conflicting files, sections, or symbols;
-- the competing interpretations;
-- the consequence of each; and
-- the smallest Design Authority decision needed.
+- the competing interpretations and consequences; and
+- the smallest authorized decision needed.
 
-Do not guess, weaken an invariant, or encode prose ambiguity as hidden policy.
+Do not guess, weaken an invariant, or hide ambiguity in implementation detail.
 
 ## Branch Workflow
 
-1. Inspect branch, base, remote dependencies, status, and preserved stashes.
+1. Verify branch, base, dependencies, worktree, and preserved state.
 2. Record pre-existing modified and untracked paths.
-3. Create or switch to the exact task branch from its required base.
-4. Edit only in-scope files and continually inspect the diff against the direct
-   base.
-5. Stage explicit paths; never use broad staging in a mixed worktree.
-6. Commit a coherent unit with an accurate imperative message.
-7. Push only the intended branch. After history rewriting, use
-   `--force-with-lease`, never unguarded force.
+3. Create or switch to the exact task branch from its required dependency.
+4. Make precise edits and inspect the direct-base diff throughout.
+5. Stage only explicit in-scope paths and commit a coherent unit.
+6. Push only that branch; guard any authorized history rewrite against remote
+   changes.
 
-Do not use destructive Git or filesystem operations to compensate for unclear
-scope or a dirty worktree.
+Use safe, repository-appropriate tools. Do not use destructive operations to
+compensate for unclear scope or a mixed worktree.
 
 ## Pull Request Workflow
 
-Keep each PR small, coherent, and independently reviewable. Its description
-should state:
-
-- purpose and direct dependency;
-- architectural boundaries and material decisions;
-- changed-file scope and material behavior;
-- exact validation performed and results; and
-- deliberate deferrals or remaining dependencies.
+Keep each PR small and independently reviewable. Describe its purpose,
+dependency, material behavior, file scope, exact validation, and deferrals.
 
 Open PRs as drafts unless instructed otherwise. Do not merge, mark ready,
-retarget, rewrite, or close a PR without explicit authorization. Before
-publication, inspect the complete diff against the intended base and verify
-that it contains no inherited or unrelated work.
+retarget, rewrite, close, or delete branches without explicit authority.
+Verify its direct-base diff contains no inherited or unrelated work.
 
 ## Stacked Pull Requests
 
-Each child PR targets its immediate prerequisite branch and contains only its
-incremental slice. Preserve dependency order.
+Each child targets its immediate prerequisite and contains only its increment.
 
 When a parent changes:
 
-1. stabilize the corrected parent first;
-2. rebase only the next child onto the corrected parent;
-3. resolve conflicts according to the corrected architecture;
-4. validate the complete inherited stack at the child head;
-5. inspect the child’s direct-base diff; and
-6. continue to later descendants only when explicitly instructed.
+1. stabilize the corrected parent;
+2. reconcile only the immediate child;
+3. validate its inherited stack and direct-base diff; and
+4. continue sequentially only when authorized.
 
-Never copy descendant work backward or modify sibling and descendant branches
-as a side effect. After merging a parent, verify and deliberately retarget the
-next PR before merging it.
+Never repair a parent through a descendant, copy later work backward, or alter
+other branches incidentally. After parent integration, verify the next base.
 
-## Dependency Ordering
+## Dependency Handling
 
-Contracts and architectural decisions precede implementations that depend on
-them. Runtime slices precede projections or capabilities that consume their
-authoritative history. Conformance claims follow the behavior they directly
-prove.
-
-Do not bypass an unresolved prerequisite with a temporary alternate path. If a
-dependency is missing, stop at that boundary.
+Stabilize authoritative prerequisites before dependent implementation. Do not
+bypass an unresolved dependency with a temporary alternate path. If a
+dependency changes materially, return affected work to the appropriate earlier
+lifecycle state and repeat all invalidated review and validation.
 
 ## Validation Expectations
 
-Validation must be proportional to risk and must cover the complete affected
-stack, not only the new happy path. Use repository-provided commands and
-mechanically derived counts rather than stale reported values.
+Validate proportionally across affected behavior and dependencies, not only a
+happy path. Select applicable focused and full checks, failure diagnostics,
+consistency checks, and direct-base diff inspection.
 
-Select applicable checks from:
-
-- focused tests for changed behavior and failure paths;
-- affected protocol and kernel suites;
-- replay, idempotency, concurrency, atomicity, and isolation tests;
-- import side-effect checks;
-- conformance and reason-code uniqueness;
-- formatting, schema, documentation, and diff checks; and
-- a final diff review against the direct base.
-
-State exactly what ran, what passed or failed, and the count. Clearly label any
-required check that was not executed and explain why. Never imply that an
-unexecuted check passed.
+Report exactly what ran, how, and with what result. Identify unexecuted required
+checks and why. Never imply they passed or present stale counts as current.
 
 ## Testing Expectations
 
-Tests must prove observable invariants, not merely execute nearby code. Use
-spies or effect counters when absence of calls or mutations is material. Cover
-positive, negative, retry, conflict, corruption, and replay paths as applicable.
+Tests prove observable requirements, including absence of effects where
+material. Cover the paths required by the controlling specification.
 
-Conformance mappings must point to tests that directly assert the normative
-scenario. Do not inflate evidence by mapping prose or broad incidental tests.
-Do not weaken production contracts to preserve stale fixtures; correct the
-fixtures and adapters.
+Requirement mappings must point to direct executable evidence.
 
 ## Standard Implementation Report
 
-Every completed implementation report should include, as applicable:
+Report, as applicable:
 
 1. outcome and architectural summary;
 2. branch, base, commit, and PR identity;
-3. files changed;
-4. behavior and invariants implemented;
-5. validation commands and exact results;
-6. conflicts, ambiguities, risks, and deliberate deferrals;
-7. confirmation of protected and untouched scope; and
-8. the exact next dependency action, when requested.
+3. files changed and material behavior;
+4. validation methods and exact results;
+5. conflicts, ambiguities, risks, and deferrals;
+6. protected and untouched scope; and
+7. the next authorized dependency action when requested.
 
-Lead with the result. Distinguish facts verified locally, facts verified from
-remote state, and conclusions inferred from evidence.
+Lead with the result; distinguish local facts, remote facts, and inferences.
 
 ## Architectural Self-Review
 
 Before committing, review the change as a Principal Architect:
 
-- Does it preserve the governing authority and Organization boundary?
-- Can every authoritative result be explained from immutable history?
-- Does replay validate the same material invariants as command-time behavior?
-- Are authentication, governance, domain logic, persistence, and replay still
-  separated?
-- Are accepted and rejected lineages complete and attributable?
-- Does failure occur before prohibited effects and without partial state?
-- Is any new abstraction broader than the current need?
-- Has reference behavior accidentally become normative architecture?
-- Is the diff the smallest complete slice?
+- Does it comply with the controlling authority and task-specific invariants?
+- Are authority and Organization boundaries preserved?
+- Are determinism, replayability, auditability, and fail-closed behavior
+  preserved where required?
+- Are responsibilities separated without hidden coupling or effects?
+- Is failure safe and free of partial authoritative state?
+- Is every new abstraction necessary now and narrowly scoped?
+- Is the result the smallest complete slice?
+- Does the direct-base diff contain only intended work?
 
-Correct discovered defects before publication. Report unresolved architectural
-questions rather than burying them in implementation detail.
+Correct defects before publication; report unresolved questions.
 
 ## Repository Conventions
 
-- Follow nearby module, naming, typing, Event, reason-code, documentation, and
-  test patterns.
-- Prefer repository-native types and stable identifiers over parallel records
-  or raw strings.
-- Keep imports side-effect free.
-- Use deterministic ordering for logically unordered collections.
-- Use the authoritative Event and execution model specified for the path; do
-  not generalize across distinct authority boundaries.
-- Search with `rg`/`rg --files` and edit files through precise patches.
-- Keep generated, temporary, and local review artifacts out of commits.
+Follow nearby repository patterns. Prefer native types and authority models
+over parallel records or raw substitutes.
+
+Inspect sufficiently, edit precisely, preserve unrelated work, and use safe
+repository-appropriate tools.
 
 ## Stop Conditions
 
-Stop implementation and report when:
+Stop and report when:
 
 - authoritative documents materially contradict each other or the task;
-- a required architectural decision is absent;
-- the exact branch, base, target, or destructive scope cannot be established;
-- user work cannot be safely separated;
-- completion requires unauthorized changes to protected artifacts or external
-  systems;
-- a required invariant cannot be represented or validated by the approved
-  contracts; or
+- a required decision or dependency is absent;
+- branch, base, target, authority, or destructive scope cannot be established;
+- unrelated user state cannot be safely separated;
+- completion requires unauthorized change to authority-bearing artifacts or
+  external systems;
+- a required invariant cannot be represented or validated within the approved
+  design; or
 - validation exposes a blocking defect outside the authorized repair scope.
 
-Do not label ordinary difficulty, incomplete investigation, or a repairable
-test failure as an architectural blocker.
+Do not treat ordinary difficulty, incomplete investigation, or a repairable
+in-scope failure as an architectural blocker.
 
 ## Completion Checklist
 
 Before every commit, confirm:
 
-- [ ] Governing Constitution, ADRs, specifications, and direct dependency were
-      inspected.
-- [ ] The branch and base are correct; unrelated work and stashes are preserved.
-- [ ] The diff contains one complete, in-scope slice with no silent expansion.
-- [ ] Existing boundaries, determinism, replay, audit, fail-closed behavior,
-      Organization authority, and capability neutrality are preserved.
-- [ ] New abstractions are required now, narrowly scoped, and justified.
-- [ ] Accepted, rejected, retry, conflict, concurrency, atomicity, and replay
-      behavior are covered where applicable.
-- [ ] Focused and affected full-suite validation was run, or omissions are
-      explicitly documented.
-- [ ] Conformance evidence directly proves its mapped requirements.
-- [ ] `git diff --check` and the direct-base diff review pass.
-- [ ] Only explicit paths are staged; protected and unrelated artifacts remain
-      untouched.
-- [ ] The commit message and implementation report accurately describe the
-      verified result.
+- [ ] Controlling authority and the direct dependency were inspected.
+- [ ] Any task-specific procedural override is explicit, narrow, and
+      authorized.
+- [ ] Branch, base, and scope are correct; unrelated state is preserved.
+- [ ] The diff contains one smallest complete slice with no silent expansion.
+- [ ] Task-specific invariants and boundaries are preserved.
+- [ ] New abstractions are presently necessary and narrowly justified.
+- [ ] Applicable behavior and failure paths have direct evidence.
+- [ ] Required validation ran, or every omission is explicitly reported.
+- [ ] The direct-base diff and repository consistency checks pass.
+- [ ] Only explicit in-scope paths are staged.
+- [ ] Commit and final report accurately describe the verified result.
